@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"escolhendo_tipo_do_bloco",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"escolhendo_tipo_do_bloco",
+  "parent":{
+    "name":"Pecas",
+    "path":"folders/Scripts/Pecas.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

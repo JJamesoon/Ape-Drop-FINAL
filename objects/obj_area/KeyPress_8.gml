@@ -1,0 +1,2 @@
+//PRA TESTAR: BACKSPACE LIGA O MURO DO ENCAIXE (SCR_QUEBRA_CABECA)
+if(QC_TESTE_ENTER and !global.game_pause) enc_iniciar();

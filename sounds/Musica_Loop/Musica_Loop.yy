@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Musica_Loop",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":107.52,
+  "exportDir":"",
+  "name":"Musica_Loop",
+  "parent":{
+    "name":"Musicas",
+    "path":"folders/Sons/Musicas.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Musica_Loop.wav",
+  "volume":1.0,
+}

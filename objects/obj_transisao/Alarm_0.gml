@@ -1,0 +1,2 @@
+//A ROOM NOVA JA CARREGOU: ABRE A CORTINA
+sair = true;

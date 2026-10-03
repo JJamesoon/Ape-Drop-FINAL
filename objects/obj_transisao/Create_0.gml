@@ -1,0 +1,16 @@
+//CORTINA DA TROCA DE ROOM. ENTRANDO: FECHA DOS LADOS. DEPOIS ABRE PRA CIMA E PRA BAIXO
+entrando = true;
+//TRUE QUANDO E HORA DE ABRIR (ALARM 0)
+sair = false;
+
+//TAMANHO DE CADA PEDAÇO DA CORTINA
+rec_e = 0;//ESQ
+rec_d = 0;//DIR
+
+rec_t = 0;//TOP
+rec_b = 0;//BAIXO
+
+//ROOM PRA ONDE VAI (SCR_TRANS)
+prox_room = noone;
+
+

@@ -1,0 +1,5 @@
+//OS TIPOS E CORES DAS PEÇAS FICAM NO SCRIPT CRIAR_PECAS
+tipo = noone;
+
+//CRIANDO PEÇA
+alarm[0] = 1;

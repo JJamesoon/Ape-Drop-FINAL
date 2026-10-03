@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_fila",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_fila",
+  "parent":{
+    "name":"Pecas",
+    "path":"folders/Scripts/Pecas.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

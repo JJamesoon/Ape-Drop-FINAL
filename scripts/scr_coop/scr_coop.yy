@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_coop",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_coop",
+  "parent":{
+    "name":"Sistema",
+    "path":"folders/Scripts/Sistema.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

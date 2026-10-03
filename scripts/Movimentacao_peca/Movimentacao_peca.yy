@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"Movimentacao_peca",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"Movimentacao_peca",
+  "parent":{
+    "name":"Pecas",
+    "path":"folders/Scripts/Pecas.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

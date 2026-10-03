@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_mobile",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_mobile",
+  "parent":{
+    "name":"Sistema",
+    "path":"folders/Scripts/Sistema.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

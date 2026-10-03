@@ -1,0 +1,3 @@
+////ELEVAR_NIVEL();
+//INTENSIDADE = 15;
+//TAM_RAIO = 4; 

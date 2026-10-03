@@ -1,0 +1,2 @@
+//PRA TESTAR NO COOP: ENTER CRIA UMA PEÇA NA HORA
+criar_bloco();

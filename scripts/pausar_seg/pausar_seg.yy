@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"pausar_seg",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"pausar_seg",
+  "parent":{
+    "name":"Efeitos",
+    "path":"folders/Scripts/Efeitos.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

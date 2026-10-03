@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"nova_spr",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"nova_spr",
+  "parent":{
+    "name":"Utilidades",
+    "path":"folders/Scripts/Utilidades.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

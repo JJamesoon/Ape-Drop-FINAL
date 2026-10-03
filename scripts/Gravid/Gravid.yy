@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"Gravid",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"Gravid",
+  "parent":{
+    "name":"Utilidades",
+    "path":"folders/Scripts/Utilidades.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

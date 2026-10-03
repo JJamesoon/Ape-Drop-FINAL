@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"textos",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"textos",
+  "parent":{
+    "name":"Config",
+    "path":"folders/Scripts/Config.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

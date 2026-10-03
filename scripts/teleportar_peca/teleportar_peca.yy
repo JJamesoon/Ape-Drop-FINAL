@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"teleportar_peca",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"teleportar_peca",
+  "parent":{
+    "name":"Pecas",
+    "path":"folders/Scripts/Pecas.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

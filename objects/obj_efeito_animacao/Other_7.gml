@@ -1,0 +1,2 @@
+//ANIMATION END: A ANIMAÇAO TERMINOU, O EFEITO SOME
+instance_destroy()

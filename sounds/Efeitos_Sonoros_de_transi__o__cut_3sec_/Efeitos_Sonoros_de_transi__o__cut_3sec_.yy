@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Efeitos_Sonoros_de_transi__o__cut_3sec_",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":3.288,
+  "exportDir":"",
+  "name":"Efeitos_Sonoros_de_transi__o__cut_3sec_",
+  "parent":{
+    "name":"Menu",
+    "path":"folders/Sons/Menu.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Efeitos_Sonoros_de_transi__o__cut_3sec_.mp3",
+  "volume":1.0,
+}

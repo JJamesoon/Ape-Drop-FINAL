@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_quebra_cabeca",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_quebra_cabeca",
+  "parent":{
+    "name":"Sistema",
+    "path":"folders/Scripts/Sistema.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

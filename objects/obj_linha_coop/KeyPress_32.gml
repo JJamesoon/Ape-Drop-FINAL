@@ -1,0 +1,5 @@
+
+//ELEVAR_NIVEL();
+//PRA TESTAR NO COOP: ESPAÇO DEIXA OS RAIOS DA LINHA MAIS FORTES
+intensidade = 15;
+tam_raio = 4; 

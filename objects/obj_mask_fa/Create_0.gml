@@ -1,0 +1,6 @@
+//MASCARA ANTIGA DO BLOCO FANTASMA. NINGUEM CRIA MAIS, MAS AS COLISOES DAS PEÇAS AINDA OLHAM PRA ELA
+//MEIO TRANSPARENTE E AZUL
+image_alpha = .5;
+image_blend = c_aqua
+pai = noone;
+meu_bloco = noone;

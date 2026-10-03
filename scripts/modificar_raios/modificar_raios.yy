@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"modificar_raios",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"modificar_raios",
+  "parent":{
+    "name":"Efeitos",
+    "path":"folders/Scripts/Efeitos.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

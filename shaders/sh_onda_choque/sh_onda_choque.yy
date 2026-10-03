@@ -1,0 +1,12 @@
+{
+  "$GMShader":"",
+  "%Name":"sh_onda_choque",
+  "name":"sh_onda_choque",
+  "parent":{
+    "name":"Efeitos",
+    "path":"folders/Scripts/Efeitos.yy",
+  },
+  "resourceType":"GMShader",
+  "resourceVersion":"2.0",
+  "type":1,
+}

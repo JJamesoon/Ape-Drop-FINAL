@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_grids",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_grids",
+  "parent":{
+    "name":"Pecas",
+    "path":"folders/Scripts/Pecas.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

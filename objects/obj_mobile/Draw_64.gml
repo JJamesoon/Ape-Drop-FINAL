@@ -1,0 +1,2 @@
+//BOTOES DE TOQUE POR CIMA DE TUDO (SO EXISTE NO CELULAR)
+mobile_botoes_desenhar();

@@ -1,0 +1,2 @@
+//PRA TESTAR NO VERSUS: ENTER CRIA UMA PEÇA NA HORA
+criar_bloco();

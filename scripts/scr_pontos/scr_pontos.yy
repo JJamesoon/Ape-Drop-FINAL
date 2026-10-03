@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_pontos",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_pontos",
+  "parent":{
+    "name":"Sistema",
+    "path":"folders/Scripts/Sistema.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

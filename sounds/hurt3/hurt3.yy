@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"hurt3",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.174036,
+  "exportDir":"",
+  "name":"hurt3",
+  "parent":{
+    "name":"Player",
+    "path":"folders/Sons/Player.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"hurt3.ogg",
+  "volume":0.89,
+}

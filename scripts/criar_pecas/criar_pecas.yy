@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"criar_pecas",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"criar_pecas",
+  "parent":{
+    "name":"Pecas",
+    "path":"folders/Scripts/Pecas.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

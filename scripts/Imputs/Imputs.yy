@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"Imputs",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"Imputs",
+  "parent":{
+    "name":"Config",
+    "path":"folders/Scripts/Config.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}
