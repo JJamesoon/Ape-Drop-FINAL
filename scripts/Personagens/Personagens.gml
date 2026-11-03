@@ -131,7 +131,7 @@ global.skin_player_1 = personagem.macaco;
 global.skin_player_2 = personagem.macaco;
 
 
-//==================== O NOME DO PERSONAGEM ESCOLHIDO NAS FALAS (ZORG E DONA MALHADA) ====================
+//==================== O NOME DO PERSONAGEM ESCOLHIDO NAS FALAS (ZORG) ====================
 //O TEXTO DIZ "{N}" NO LUGAR DE "MACACO" E O JOGO TROCA PELO QUE FOI ESCOLHIDO (PLAYER 1). O ARTIGO ACOMPANHA O GENERO:
 //{N} = NOME (MACACO, MOCHILEIRO, PÁSSARO ÁGUIA, LAGARTIXA), {O} = O/A, {NO} = NO/NA, {UM} = UM/UMA
 function heroi_nome()

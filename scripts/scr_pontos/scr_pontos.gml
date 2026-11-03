@@ -23,7 +23,6 @@
 function bloco_golpe(_peca)
 {
 	if(!instance_exists(_peca)) return false;
-	global.tut_quebrou = true; //TUTORIAL: O JOGADOR QUEBROU (OU TENTOU QUEBRAR) UM BLOCO
 	if(_peca.sou_pedra)
 	{
 		if(_peca.pedra_imune > 0) return false;

@@ -1,5 +1,3 @@
-//TUTORIAL: AS PEÇAS NASCEM SO QUANDO A VACA MANDA (SCR_PODERES)
-if(global.tutorial) { alarm[0] = room_speed; exit; }
 //ZORG ABRE A PARTIDA (SCR_PODERES): A PRIMEIRA PEÇA ESPERA ELE FALAR E SUMIR
 if(zorg_segurando()) { alarm[0] = 5; exit; }
 

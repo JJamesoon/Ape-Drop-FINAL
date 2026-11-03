@@ -489,7 +489,7 @@ function blocos_procurar_novos()
 
 
 //==================== ABERTURA DA PARTIDA: AS PRIMEIRAS PEÇAS SAO SEMPRE AS MESMAS ====================
-//NO ARCADE (1 JOGADOR, FORA DO TUTORIAL) AS 5 PRIMEIRAS PEÇAS NASCEM SEMPRE IGUAIS, NA COLUNA CERTA E JA NA POSIÇAO: E SO APERTAR
+//NO ARCADE (1 JOGADOR) AS 5 PRIMEIRAS PEÇAS NASCEM SEMPRE IGUAIS, NA COLUNA CERTA E JA NA POSIÇAO: E SO APERTAR
 //ESPAÇO (TELEPORTE) EM CADA UMA PRA ELAS FECHAREM A PRIMEIRA LINHA E O JOGADOR VER COMO FUNCIONA.
 //CADA ITEM: [TIPO, COR, COLUNA DO BLOCO PAI]. A ARENA TEM 10 COLUNAS (0 A 9): O(4-5) + J(2-3) + L(6-7) + O(0-1) + O(8-9) = 10 CASAS NA LINHA DE BAIXO
 global.abertura_i = 0;	//QUANTAS PEÇAS DA ABERTURA JA NASCERAM
@@ -512,7 +512,7 @@ function abertura_iniciar()
 //A ABERTURA VALE NESSA PARTIDA? (SO NA ARENA DE 10 COLUNAS DO ARCADE SOLO)
 function abertura_ativa()
 {
-	return modo_arcade() and !modo_versus() and !global.coop and !global.tutorial and !global.teste_dif and !MOBILE and global.abertura_i < array_length(global.abertura_pecas) and global.debug_bloco == "" and instance_exists(obj_area) and obj_area.cols == 10;
+	return modo_arcade() and !modo_versus() and !global.coop and !global.teste_dif and !MOBILE and global.abertura_i < array_length(global.abertura_pecas) and global.debug_bloco == "" and instance_exists(obj_area) and obj_area.cols == 10;
 }
 
 
@@ -548,7 +548,7 @@ function frio_iniciar_partida()
 //O FRIO PODE COMEÇAR AGORA? (NAO EMBOLA COM OUTROS EVENTOS)
 function frio_livre()
 {
-	if(global.frio_ativo or global.tutorial or global.contagem > 0 or global.andar_pausa > 0 or global.onda_timer > 0) return false;
+	if(global.frio_ativo or global.contagem > 0 or global.andar_pausa > 0 or global.onda_timer > 0) return false;
 	if(!is_undefined(global.zq) or zorg_segurando() or desafio_ativo() or instance_exists(obj_onda_laser)) return false;
 	if(instance_exists(obj_game_control) and obj_game_control.onda_restantes > 0) return false;
 	return true;

@@ -1,7 +1,7 @@
 //==================== MENU PRINCIPAL NOVO (OBJ_MENU_PRINCIPAL) ====================
 //LISTA UNICA NA ESQUERDA (TODAS AS OPÇOES A VISTA, UMA EMBAIXO DA OUTRA), E NA DIREITA UM CARTAO QUE EXPLICA A OPÇAO SELECIONADA.
 //EMBAIXO, A BARRA COM AS TECLAS DE CADA TELA. NAVEGAÇAO: CIMA/BAIXO (OU W/S), ESPAÇO/ENTER ESCOLHE, ESC VOLTA, E O MOUSE TAMBEM FUNCIONA.
-//COOP E VERSUS SAEM DIRETO DA LISTA (SEM SUBMENU) E O "TUTORIAL" AGORA ABRE O TUTORIAL DE VERDADE (A TABELA DOS BLOCOS VIROU "BLOCOS").
+//COOP E VERSUS SAEM DIRETO DA LISTA (SEM SUBMENU) E O "BLOCOS" ABRE A TABELA DOS BLOCOS.
 //PRA VOLTAR AO MENU ANTIGO DE SPRITES SEM APAGAR CODIGO: MENU_NOVO = FALSE.
 #macro MENU_NOVO		true
 #macro MENU_LISTA_X		22		//X DO TEXTO DAS OPÇOES
@@ -26,10 +26,6 @@ function menu_itens()
 			nome : ["VERSUS", "VERSUS"],
 			desc : ["DUELO DE 2 JOGADORES. AQUI É CADA MACACO NO SEU GALHO.",
 					"A 2-PLAYER DUEL. HERE IT'S EVERY MONKEY ON ITS OWN BRANCH."] },
-		{ id : "tutorial", grupo : 1, tag : "",
-			nome : ["TUTORIAL", "TUTORIAL"],
-			desc : ["O TERRÍVEL ZORG NÃO VAI SER NEM UM POUCO GENTIL, ENTÃO VOCÊ PRECISA SABER O QUE FAZER. APRENDA A SOBREVIVER NO DESAFIO DA GRADE!",
-					"THE TERRIBLE ZORG WON'T BE KIND AT ALL, SO YOU NEED TO KNOW WHAT TO DO. LEARN TO SURVIVE THE GRID CHALLENGE!"] },
 		{ id : "blocos", grupo : 1, tag : "",
 			nome : ["BLOCOS", "BLOCKS"],
 			desc : ["BLOCOS DESCOBERTOS.",
@@ -60,7 +56,6 @@ function menu_itens()
 //CHAMADO NO CREATE DO OBJ_MENU_PRINCIPAL: ESTADO DA LISTA NOVA
 function menu_novo_criar()
 {
-	global.tutorial_forcar = false;		//VOLTOU DA SELEÇAO SEM JOGAR: NAO FICA PEDINDO O TUTORIAL NA PROXIMA PARTIDA
 	global.versus_sel = false;
 	global.teste_dif = false;	//O TESTE DE DIFICULDADE SO VALE ATE VOLTAR PRO MENU
 	mn_itens = menu_itens();
@@ -125,13 +120,6 @@ function menu_novo_ativar(_id)
 			som_tocar(snd_menu_select_01);
 			global.coop = false;
 			global.versus_sel = true;
-			scr_trans(rm_selecao);
-			break;
-		case "tutorial":	//VAI ESCOLHER O PERSONAGEM E COMEÇA NO TUTORIAL DA DONA MALHADA (MESMO QUE JA TENHA FEITO)
-			som_tocar(snd_menu_select_01);
-			global.versus_sel = false;
-			global.coop = false;
-			global.tutorial_forcar = true;
 			scr_trans(rm_selecao);
 			break;
 		case "blocos":
@@ -397,10 +385,8 @@ function menu_novo_draw()
 		if(_s < .5) menu_texto(_x, _y + 1, _it.nome[_l], _cor, _a * (.8 + _s * .4));
 		else draw_text_transformed_color(_x, _y + 1, _it.nome[_l], 1, 1, 0, _cor, _cor, _cor, _cor, _a);
 
-		//SELO NA DIREITA: 1P / 2P, E "NOVO!" PISCANDO NO TUTORIAL ENQUANTO ELE NAO FOI FEITO
+		//SELO NA DIREITA: 1P / 2P
 		var _tag = _it.tag;
-		var _novo = (_it.id == "tutorial" and !global.tutorial_feito);
-		if(_novo) _tag = _pt ? "NOVO!" : "NEW!";
 		if(_tag != "")
 		{
 			var _tx = MENU_PAINEL_X - 62;
@@ -439,13 +425,9 @@ function menu_novo_draw()
 	{
 		case "arcade":
 			array_push(_ex, [_pt ? "RECORDE" : "RECORD", string(global.record_1), #8BFF32]);
-			if(!global.tutorial_feito) array_push(_ex, [_pt ? "AVISO" : "NOTE", _pt ? "NA PRIMEIRA VEZ, COMEÇA PELO TUTORIAL" : "THE FIRST TIME STARTS WITH THE TUTORIAL", #FFE66B]);
 			break;
 		case "coop":
 			array_push(_ex, [_pt ? "RECORDE" : "RECORD", string(global.record_coop), #8BFF32]);
-			break;
-		case "tutorial":
-			array_push(_ex, [_pt ? "SITUAÇÃO" : "STATUS", global.tutorial_feito ? (_pt ? "JÁ FEITO (PODE REFAZER)" : "DONE (YOU CAN REDO IT)") : (_pt ? "AINDA NÃO FEITO" : "NOT DONE YET"), global.tutorial_feito ? #8BFF32 : #FFE66B]);
 			break;
 		case "blocos":
 			var _cat = blocos_catalogo();

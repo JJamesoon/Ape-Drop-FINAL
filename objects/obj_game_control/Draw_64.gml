@@ -385,9 +385,6 @@ if(menu_debug)
 }
 #endregion
 
-//TUTORIAL DA DONA MALHADA (CAIXA DE DIALOGO)
-tutorial_desenhar();
-
 //GUIA DA PRIMEIRA LINHA (SCR_PODERES): BRILHO LEVE NA LINHA QUE FICA EM CIMA DO CHAO + SETAS
 guia_linha_desenhar();
 
@@ -532,8 +529,8 @@ else
 		var _rod = dois_players() ? (_pt ? "P2: SETAS + C X Z V (OU O 2º CONTROLE)" : "P2: ARROWS + C X Z V (OR 2ND GAMEPAD)") : (_pt ? "ESC / B: VOLTAR" : "ESC / B: BACK");
 		draw_text_transformed_color(_cx * _e, (_y - 4 + array_length(_linhas) * 17 + 4) * _e, _rod, _e * .6, _e * .6, 0, #C7CFDD, #C7CFDD, #C7CFDD, #C7CFDD, _a);
 	}
-	var _opcoes = [texto("continuar_jogo"), global.linguagem == 0 ? "COMANDOS" : "CONTROLS", "TUTORIAL", (global.linguagem == 0 ? "TECLAS" : "KEYS") + ": " + (global.mostrar_teclas ? (global.linguagem == 0 ? "SIM" : "ON") : (global.linguagem == 0 ? "NÃO" : "OFF")), (global.linguagem == 0 ? "TESTE DE DIFICULDADE: " : "DIFFICULTY TEST: ") + (global.teste_dif ? (global.linguagem == 0 ? "SIM" : "ON") : (global.linguagem == 0 ? "NÃO" : "OFF")), texto("reiniciar"), texto("voltar_menu")];
-	for(var i = 0; i < (ver_comandos ? 0 : 7); i++)
+	var _opcoes = [texto("continuar_jogo"), global.linguagem == 0 ? "COMANDOS" : "CONTROLS", (global.linguagem == 0 ? "TECLAS" : "KEYS") + ": " + (global.mostrar_teclas ? (global.linguagem == 0 ? "SIM" : "ON") : (global.linguagem == 0 ? "NÃO" : "OFF")), (global.linguagem == 0 ? "TESTE DE DIFICULDADE: " : "DIFFICULTY TEST: ") + (global.teste_dif ? (global.linguagem == 0 ? "SIM" : "ON") : (global.linguagem == 0 ? "NÃO" : "OFF")), texto("reiniciar"), texto("voltar_menu")];
+	for(var i = 0; i < (ver_comandos ? 0 : 6); i++)
 	{
 		var _sel = opcao_pause == i;
 		var _bw = 160, _bh = 18;

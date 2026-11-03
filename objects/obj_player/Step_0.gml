@@ -150,7 +150,7 @@ _jump_giro_press= keyboard_check(imp.giro_press);
 _dash			= keyboard_check_pressed(imp.dash);
 
 //RECUO DO GIRO LATERAL: POR UM TEMPINHO O PLAYER NAO RESPONDE AOS COMANDOS (SO DESLIZA PRA TRAS, FREANDO)
-if(giro_lat_trava > 0 or global.tut_trava or vs_parado or amassado > 0)
+if(giro_lat_trava > 0 or global.zorg_trava or vs_parado or amassado > 0)
 {
 	if(giro_lat_trava > 0) giro_lat_trava--;
 	_left = false; _right = false; _down = false;
@@ -159,10 +159,6 @@ if(giro_lat_trava > 0 or global.tut_trava or vs_parado or amassado > 0)
 	velh = lerp(velh, 0, .08);
 }
 
-//TUTORIAL: TREINO DE UM GOLPE SO (A VACA TRAVA OS OUTROS: SOCO FRACO, SOCO FORTE E GIRO)
-if(global.tut_sem_fraco) _soco = false;
-if(global.tut_sem_forte) _soco_press = false;
-if(global.tut_sem_giro) { _jump_giro = false; _jump_giro_press = false; }
 
 //ENSINO NATURAL: ANOTA O QUE ELE JA APRENDEU E ESCOLHE A DICA DO MOMENTO (SO APARECE SE ELE TRAVAR NUMA COISA QUE NAO SABE)
 ensino_player_atualizar();

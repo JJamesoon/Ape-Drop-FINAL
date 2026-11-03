@@ -136,9 +136,6 @@ voltar_menu = function()
 if(modo_arcade()) habil_zerar();
 min_aviso = floor(global.tempo_partida / 60);	//ULTIMO MINUTO DE PARTIDA QUE JA AVISOU "PEÇAS MAIS RAPIDAS"
 
-//TUTORIAL DA DONA MALHADA (SCR_PODERES): NA 1A VEZ NO ARCADE (OU QUANDO A PAUSA PEDE). TEM QUE FICAR POR ULTIMO (SEGURA OS TIMERS DE CIMA)
-tutorial_iniciar();
-
 //ZORG, O ALIEN QUE CONTROLA A GRADE (SCR_PODERES): ZERA O ESTADO DELE NA PARTIDA
 zorg_iniciar();
 

@@ -169,7 +169,7 @@ criar_bloco = function()
 	if(_cheia)
 	{
 		topo_cheio_vezes++;
-		if(topo_cheio_vezes >= 2 and (IMORTAL or global.tutorial)) { with(obj_peca) instance_destroy(); topo_cheio_vezes = 0; } //MODO DE TESTE: SO LIMPA
+		if(topo_cheio_vezes >= 2 and IMORTAL) { with(obj_peca) instance_destroy(); topo_cheio_vezes = 0; } //MODO DE TESTE: SO LIMPA
 		else if(topo_cheio_vezes >= 2) with(obj_player) morrer();
 		exit;
 	}
@@ -270,7 +270,6 @@ criar_bloco_fantasma = function()
 limpar_linhas = function(_linhas)
 {
 	habil_aprender("linha"); //ENSINO NATURAL: JA SABE FECHAR LINHA
-	global.tut_linha = true; //TUTORIAL: FECHOU A LINHA
 	var _n = array_length(_linhas);
 	if(_n >= 3) zorg_falar("combo"); //ZORG: FECHOU 3 LINHAS OU MAIS DE UMA VEZ
 	var _regua = instance_exists(obj_linha) ? instance_nearest(x + sprite_width/2, y, obj_linha) : noone;

@@ -83,7 +83,7 @@ enum state
 //ANDA PRO LADO DAS TECLAS (_LERP = QUAO RAPIDO CHEGA NA VELOCIDADE)
 mover = function(_vel, _lerp = .7)
 {
-	if(giro_lat_trava > 0 or global.tut_trava or vs_parado or amassado > 0) exit; //SEM CONTROLE (RECUO DO GIRO LATERAL): NAO ANDA PELAS TECLAS
+	if(giro_lat_trava > 0 or global.zorg_trava or vs_parado or amassado > 0) exit; //SEM CONTROLE (RECUO DO GIRO LATERAL): NAO ANDA PELAS TECLAS
 	
 	var _left, _right;
 	
@@ -131,7 +131,6 @@ timer_morte = 0;	//TEMPO DESDE QUE MORREU (ANIMAÇAO DE MORTE)
 #macro DANO_PONTOS	800
 dano_cobrar = function()
 {
-	if(global.tutorial) exit; //NO TUTORIAL O DANO SO EMPURRA
 	if(modo_arcade() and !modo_versus() and global.pontos_1 > 0)
 	{
 		pontos_tirar(DANO_PONTOS, x, bbox_top - 14); //(NO MODO IMORTAL OS PONTOS TAMBEM CAEM: SO OS CORAÇOES FICAM PROTEGIDOS)
@@ -206,7 +205,7 @@ efeito_dano = function(_dir)
 //MORRER (ESMAGADO, SEM VIDA OU ARENA CHEIA). O OBJ_GAME_CONTROL MOSTRA O GAME OVER
 morrer = function(_forcar = false)
 {
-	if(estado == state.morte or vs_fantasma or ((IMORTAL or global.tutorial) and !_forcar)) exit; //(NO TUTORIAL NINGUEM MORRE. _FORCAR: VERSUS, ARENA CHEIA)
+	if(estado == state.morte or vs_fantasma or (IMORTAL and !_forcar)) exit; //(_FORCAR: VERSUS, ARENA CHEIA)
 	if(room == rm_versus and global.vs_perdedor == 0) global.vs_perdedor = jogador; //VERSUS: QUEM MORRE PERDE
 	if(TESTE_AUTO) show_debug_message("[TESTE] player morreu: " + string(debug_get_callstack()));
 	

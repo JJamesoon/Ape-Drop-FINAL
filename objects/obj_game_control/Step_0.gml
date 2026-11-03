@@ -15,8 +15,6 @@ var _down	= keyboard_check_pressed(ord("S")) or keyboard_check_pressed(vk_down);
 var _enter	= keyboard_check_pressed(vk_space) or keyboard_check_pressed(vk_enter) or (MOBILE and keyboard_check_pressed(global.imputs.soco));
 var _voltar	= keyboard_check_pressed(vk_escape);
 
-//TUTORIAL DA DONA MALHADA (SCR_PODERES): AS FALAS E AS METAS. NAO RODA NA PAUSA
-if(global.tutorial and !pausado and !menu_poder) tutorial_atualizar();
 //ZORG: A FRASE NO TOPO DA TELA (SCR_PODERES)
 if(!pausado and !menu_poder) zorg_atualizar();
 
@@ -75,7 +73,7 @@ if(fim_jogo)
 
 #region MENU DE DEBUG DOS BLOCOS (ENTER)
 //ENTER NO ARCADE: PAUSA O JOGO E ABRE A LISTA DE BLOCOS. SETAS ESCOLHEM, ENTER FAZ ESSE BLOCO NASCER AGORA, ESC FECHA
-if(DEBUG_BLOCOS and modo_arcade() and !global.tutorial and !modo_versus())
+if(DEBUG_BLOCOS and modo_arcade() and !modo_versus())
 {
 	//TECLA APERTADA (NO TESTE AUTOMATICO O OBJ_TESTE_AUTO "APERTA" PELA GLOBAL.TESTE_TECLA, QUE E GASTA AQUI)
 	var _tecla = function(_k)
@@ -158,7 +156,7 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 	{
 		if(_up xor _down)
 		{
-			opcao_pause = (opcao_pause + _down - _up + 7) mod 7;
+			opcao_pause = (opcao_pause + _down - _up + 6) mod 6;
 			som_tocar(snd_menu_select_03);
 		}
 		if(keyboard_check_pressed(ord("R"))) { reiniciar(); exit; }
@@ -170,20 +168,14 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 			{
 				case 0: pausado = false; break;
 				case 1: ver_comandos = true; break;
-				case 2:	//REFAZER O TUTORIAL DA DONA MALHADA (SO NO ARCADE SOLO)
-					if(global.coop or MOBILE or modo_versus()) { som_tocar(snd_menu_erro_04); break; }
-					global.tutorial_forcar = true;
-					global.teste_dif = false;
-					reiniciar();
-					exit;
-				case 3: global.mostrar_teclas = !global.mostrar_teclas; jogo_salvar(); break; //LIGA/DESLIGA A TIRA DE COMANDOS
-				case 4:	//TESTE DE DIFICULDADE: LIGA/DESLIGA E REINICIA NA HORA (LIGADO: LEVEL 3 E 20 MIN, TODOS OS BLOCOS)
+				case 2: global.mostrar_teclas = !global.mostrar_teclas; jogo_salvar(); break; //LIGA/DESLIGA A TIRA DE COMANDOS
+				case 3:	//TESTE DE DIFICULDADE: LIGA/DESLIGA E REINICIA NA HORA (LIGADO: LEVEL 3 E 20 MIN, TODOS OS BLOCOS)
 					if(modo_versus() or MOBILE) { som_tocar(snd_menu_erro_04); break; }
 					global.teste_dif = !global.teste_dif;
 					reiniciar();
 					exit;
-				case 5: reiniciar(); exit;
-				case 6: voltar_menu(); exit;
+				case 4: reiniciar(); exit;
+				case 5: voltar_menu(); exit;
 			}
 		}
 	}
@@ -270,7 +262,7 @@ if(pause_timer > 0)
 
 //TIMERS
 //TEMPO DE PARTIDA (SEGUNDOS) E OS EFEITOS QUE ACABAM SOZINHOS
-if(!global.tutorial) global.tempo_partida += 1 / room_speed; //(NO TUTORIAL O RELOGIO FICA ZERADO)
+global.tempo_partida += 1 / room_speed;
 global.ensino_t++;
 //A CADA MINUTO DE PARTIDA (ATE O TEMPO PARAR DE ACELERAR AS PEÇAS) AVISA QUE FICOU MAIS RAPIDO
 var _min_atual = floor(global.tempo_partida / 60);
@@ -287,7 +279,7 @@ if(global.febre > 0)			global.febre--;
 if(global.febre <= 0)			global.febre_rapida = false;
 
 //MODO QUEBRA-CABEÇA: PODE APARECER SOZINHO (SCR_QUEBRA_CABECA)
-if(modo_arcade() and !modo_versus() and !global.tutorial) qc_sortear();
+if(modo_arcade() and !modo_versus()) qc_sortear();
 
 //CONTAGEM DE 3S ANTES DE ACELERAR: BIPA A CADA SEGUNDO E NO FIM ACELERA
 if(global.contagem > 0)

@@ -8,9 +8,7 @@ global.record_coop	= 0;	//RECORDE DO COOP
 
 global.som_geral	= 1;	//VOLUME GERAL (0 A 1)
 global.musica		= .5;	//VOLUME DA MUSICA (0 A 1)
-global.tutorial_feito = false;	//JA FEZ O TUTORIAL DA DONA MALHADA (SALVO)
 global.teste_dif = false;	//PAUSA > TESTE DE DIFICULDADE: A PARTIDA COMEÇA COM 20 MIN E LEVEL 3 (TODOS OS BLOCOS). NAO CONTA RECORDE. SOBREVIVE AO REINICIAR
-global.tutorial_forcar = false;	//A PAUSA PEDIU PRA REFAZER O TUTORIAL (VALE SO NA PROXIMA PARTIDA)
 global.mostrar_teclas = true;	//TIRA DE COMANDOS NO RODAPE DA PARTIDA LIGADA (CONFIGURAÇOES E PAUSA)
 global.shake		= true;	//TREMIDA DA TELA LIGADA
 global.full_screen	= false;	//TELA CHEIA
@@ -34,7 +32,6 @@ function jogo_salvar()
 	ini_write_real("config", "musica",		global.musica);
 	ini_write_real("config", "shake",		global.shake);
 	ini_write_real("config", "teclas_tela",	global.mostrar_teclas ? 1 : 0);
-	ini_write_real("config", "tutorial_feito", global.tutorial_feito ? 1 : 0);
 	ini_write_real("config", "tela_cheia",	global.full_screen);
 	ini_write_real("config", "idioma",		global.linguagem);
 	ini_write_real("config", "controles",	global.meus_imputs);
@@ -72,7 +69,6 @@ function jogo_carregar()
 	global.musica		= ini_read_real("config", "musica",		global.musica);
 	global.shake		= ini_read_real("config", "shake",		global.shake);
 	global.mostrar_teclas = ini_read_real("config", "teclas_tela", 1) == 1;
-	global.tutorial_feito = ini_read_real("config", "tutorial_feito", 0) == 1;
 	global.full_screen	= ini_read_real("config", "tela_cheia",	global.full_screen);
 	global.linguagem	= ini_read_real("config", "idioma",		global.linguagem);
 	global.meus_imputs	= ini_read_real("config", "controles",	global.meus_imputs);
