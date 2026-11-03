@@ -96,18 +96,6 @@ function escolhe_grid(_grid = false, _area = false, _line = false)
 		if(_grid) return global.grid;
 		if(_line) return obj_linha;
 	}
-	else if(instance_exists(obj_area_versus) and position_meeting(_x, _y, obj_area_versus))
-	{
-		if(_area) return instance_position(_x, _y, obj_area_versus);
-		if(_grid) return global.grid_2;
-		if(_line) return obj_linha_versus;
-	}
-	else if(instance_exists(obj_area_coop) and position_meeting(_x, _y, obj_area_coop))
-	{
-		if(_area) return instance_position(_x, _y, obj_area_coop);
-		if(_grid) return global.grid_2;
-		if(_line) return obj_linha_coop;
-	}
 	return undefined;
 }
 

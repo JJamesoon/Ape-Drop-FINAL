@@ -111,11 +111,10 @@ switch(estado)
 		}
 		if(som_quebra > 0) som_quebra--;
 
-		//ENCOSTOU NO PLAYER: MORRE (NO MODO IMORTAL SO FALHA)
-		//(NO COOP SO FALHA SE OS DOIS MORREREM: QUEM SOBROU CONTINUA)
+		//OS ESPINHOS ENCOSTARAM NO PLAYER: LEVA DANO (PONTOS OU CORAÇAO) E O DESAFIO FALHA
 		var _tocou = false;
-		with(obj_player) if(estado != state.morte and bbox_top < _y - 2) { morrer(); _tocou = true; }
-		if(_tocou and (!global.coop or todos_mortos())) terminar(false);
+		with(obj_player) if(estado != state.morte and bbox_top < _y - 2) { levar_dano(0); _tocou = true; }
+		if(_tocou) terminar(false);
 		break;
 
 	//FIM: OS ESPINHOS SOBEM, A GUI SOME E O OBJETO SE DESTROI

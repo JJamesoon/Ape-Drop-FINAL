@@ -179,7 +179,7 @@ conf_linhas = function()
 	{
 		case menu_conf.audio:		return [texto("musica"), texto("som_geral")];
 		case menu_conf.controles:	return [texto("layout"), texto("mover"), texto("pular"), texto("soco"), texto("soco_forte"), texto("giro"), texto("queda_livre"), texto("dash"), texto("especial")];
-		case menu_conf.jogo:		return [texto("tela_cheia"), texto("tremor")];
+		case menu_conf.jogo:		return [texto("tela_cheia"), texto("tremor"), texto("teclas_tela")];
 	}
 	return [texto("audio"), texto("control"), texto("op_game"), texto("language")];
 }
@@ -205,3 +205,6 @@ modo_indisponivel = function(_i)
 	mostrar_msg = room_speed * .8;
 	som_tocar(snd_menu_erro_04);
 }
+
+//LISTA NOVA DO MENU PRINCIPAL (SCR_MENU)
+menu_novo_criar();

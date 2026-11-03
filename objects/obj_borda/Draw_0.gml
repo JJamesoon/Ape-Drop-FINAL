@@ -1,3 +1,10 @@
+//COOP (RM_COOP): MOLDURA NOVA E UMA CAIXA PRA CADA JOGADOR (SCR_COOP, COOP_HUD_DESENHAR). O RESTO DO ARCADE CONTINUA ABAIXO
+if(room == rm_coop)
+{
+	coop_hud_desenhar();
+	exit;
+}
+
 //DESENHANDO A BORDA========================
 var shake_x, shake_y;
 
@@ -150,6 +157,68 @@ if(modo_arcade())
 	{
 		var _yy = _by2 - _alt * i / ENERGIA_MAX;
 		draw_line_color(_bx1, _yy, _bx2 + 1, _yy, c_white, c_white);
+	}
+	
+	//DIMINUINDO (TEMPO PARADO): UM BRILHO LEVE NA PONTINHA DA BARRA E FAISCAS CAINDO DELA
+	if(global.tempo_fase != "" and global.energia > 0)
+	{
+		var _bc = (_bx1 + _bx2) / 2;
+		gpu_set_blendmode(bm_add);
+		draw_set_color(TEMPO_VERDE);
+		draw_set_alpha(.3 * _pulso);
+		draw_circle(_bc, _topo, 6, false);
+		draw_set_alpha(.7);
+		draw_circle(_bc, _topo, 2, false);
+		for(var k = 0; k < 4; k++)
+		{
+			var _fa = ((current_time / 30 + k * 7) mod 16);
+			draw_set_alpha(.8 * (1 - _fa / 16));
+			draw_circle(_bc + sin(k * 2.1 + current_time / 110) * 2, _topo + _fa, 1, false);
+		}
+		draw_set_alpha(1);
+		draw_set_color(c_white);
+		gpu_set_blendmode(bm_normal);
+	}
+	
+	//ENCHEU A BARRA: SOM, TREMIDA, ONDA E UMA PULSAÇAO QUE ABRE EM VOLTA DELA
+	if(!variable_instance_exists(id, "energia_pulso")) { energia_pulso = 0; energia_cheia_ant = global.energia >= ENERGIA_MAX; }
+	var _cheia_agora = global.energia >= ENERGIA_MAX;
+	if(_cheia_agora and !energia_cheia_ant)
+	{
+		energia_pulso = 1;
+		som_tocar(snd_certo);
+		audio_play_sound(snd_feitico, 2, false, .7, 0, 1.7);
+		audio_play_sound(snd_jingle_poder, 2, false, .5, 0, 1.4);
+		shakes(5, 2);
+		onda_choque(x - 4, y + 150, 50, 4, 24);
+	}
+	energia_cheia_ant = _cheia_agora;
+	if(energia_pulso > 0)
+	{
+		var _ex = (1 - energia_pulso) * 9;
+		gpu_set_blendmode(bm_add);
+		draw_set_color(TEMPO_VERDE);
+		draw_set_alpha(energia_pulso * .8);
+		draw_rectangle(_bx1 - _ex, _by1 - _ex, _bx2 + _ex, _by2 + _ex, true);
+		draw_rectangle(_bx1 - _ex * .5, _by1 - _ex * .5, _bx2 + _ex * .5, _by2 + _ex * .5, true);
+		draw_set_color(c_white);
+		draw_set_alpha(energia_pulso * .6);
+		draw_rectangle(_bx1, _by1, _bx2, _by2, false);
+		draw_set_alpha(1);
+		gpu_set_blendmode(bm_normal);
+		energia_pulso = max(0, energia_pulso - .03);
+	}
+	//BATIMENTO SUAVE ENQUANTO ESTA CHEIA (ESPERANDO USAR)
+	if(_cheia_agora and global.tempo_fase == "")
+	{
+		var _bt = max(0, sin(current_time / 260)) * 2.5;
+		gpu_set_blendmode(bm_add);
+		draw_set_color(TEMPO_VERDE);
+		draw_set_alpha(.25 + .2 * _bt / 2.5);
+		draw_rectangle(_bx1 - _bt, _by1 - _bt, _bx2 + _bt, _by2 + _bt, true);
+		draw_set_alpha(1);
+		draw_set_color(c_white);
+		gpu_set_blendmode(bm_normal);
 	}
 	
 	//ENERGIA CHEIA: ALERTA DO PODER DE PARAR O TEMPO DO LADO DA BARRA (RELOGIO, NOME E A TECLA 1), COM UMA SETA PRA BARRA

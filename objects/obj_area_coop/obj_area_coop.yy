@@ -17,7 +17,10 @@
     "name":"Area",
     "path":"folders/Objetos/Area.yy",
   },
-  "parentObjectId":null,
+  "parentObjectId":{
+    "name":"obj_area",
+    "path":"objects/obj_area/obj_area.yy",
+  },
   "persistent":false,
   "physicsAngularDamping":0.1,
   "physicsDensity":0.5,

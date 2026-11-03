@@ -1,2 +1,2 @@
-//PRA TESTAR NO VERSUS: SHIFT TREME A TELA DO PLAYER 2
-shakes(true);
+//DO VERSUS: USA O DO OBJ_AREA
+event_inherited();

@@ -1,6 +1,6 @@
 //PAUSADO: A PEÇA FICA PARADA
 //NO TEMPO PARADO O BLOCO NAO CAI, MAS O PLAYER AINDA EMPURRA ELE PRO LADO
-if(global.game_pause)
+if(pausa_em(x))
 {
 	if(tempo_player_livre() and prox_x != x)
 	{
@@ -359,7 +359,7 @@ if(irmandade)
 	{
 		if(andar)//EM MOVIMENTO
 		{
-			controlando_velocidade(sou_raivoso ? vel_raivoso : vel);
+			controlando_velocidade((sou_raivoso ? vel_raivoso : vel) + (global.peca_acelerada_timer > 0 and global.peca_acelerada == id ? PECA_ACELERADA_EXTRA : 0));
 			//CHEGOU NA PROXIMA CASA: PARA E ESPERA O TEMPO DA QUEDA
 			if (round(y) >= prox_y)
 			{
@@ -437,7 +437,7 @@ else
 {
 	if(andar)//EM MOVIMENTO
 	{
-		velv = sou_raivoso ? vel_raivoso : vel;
+		velv = (sou_raivoso ? vel_raivoso : vel) + (global.peca_acelerada_timer > 0 and global.peca_acelerada == id ? PECA_ACELERADA_EXTRA : 0); //SEGURANDO BAIXO EM CIMA: MAIS RAPIDA
 		
 		//CHEGOU NA PROXIMA CASA: PARA E ESPERA O TEMPO DA QUEDA
 		if (y >= prox_y-.1)

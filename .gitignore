@@ -57,3 +57,8 @@ Temporary Items
 # GameMaker temporary files
 *.resource_order
 *.old
+# GERADOS PELO COMPILADOR E ARQUIVOS DE TRABALHO (NAO VAO PRO GIT)
+--temp/
+output/
+Artes_ape.zip
+*.apk

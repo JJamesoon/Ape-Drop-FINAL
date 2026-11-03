@@ -20,17 +20,22 @@ if(pegou)
 	exit;
 }
 
-//PAUSADO: A MOEDA FICA PARADA
-if(global.game_pause) exit;
+//PAUSADO: A MOEDA FICA PARADA (NO TEMPO PARADO O PLAYER AINDA PEGA ELA)
+if(global.game_pause and !tempo_player_livre()) exit;
+var _mov = !global.game_pause;
 
 //ACABOU O TEMPO: SOME
-timer++;
-if(timer >= MOEDA_VIDA) { instance_destroy(); exit; }
+if(_mov)
+{
+	timer++;
+	if(timer >= MOEDA_VIDA) { instance_destroy(); exit; }
+}
 
 var _p = player_perto(x, y); //NO COOP, O MAIS PERTO
 
 //IMA: PUXA A MOEDA PRO PLAYER
-if(_p != noone and tem_poder("ima") and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
+if(!_mov) { /* TEMPO PARADO: NAO SE MEXE */ }
+else if(_p != noone and tem_poder("ima") and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
 {
 	var _dir = point_direction(x, y, _p.x, _p.y - 10);
 	x += lengthdir_x(3, _dir);

@@ -30,6 +30,11 @@ if(sou_fantasma)
 }else if(sou_buraco)
 {
 	_minha_spr = spr_bloco_buraco;
+}else if(sou_sensor)
+{
+	//SNIPER: SPRITE PROPRIA. PARADO ELE FICA "OLHANDO" (SPR_BLOCO_SNIPER_IDLE). REVELADO (O PLAYER PASSOU NA LINHA DELE) TOCA
+	//SPR_BLOCO_SNIPER_TIRO: A SETA VAI CRESCENDO DURANTE A CONTAGEM (SENSOR_AVISO) ATE ELE SE LANÇAR
+	_minha_spr = sensor_timer < 0 ? spr_bloco_sniper_idle : spr_bloco_sniper_tiro;
 }else if(sou_laser)
 {
 	//O LASER USA A SPRITE PROPRIA (O STEP TROCA PRA ELA E ANIMA).
@@ -48,6 +53,12 @@ var _img = image_index;
 if(_minha_spr == spr_peca and image_index < 5 and (sou_raio or raio_azul())) _img = cores.c_aqua;
 if(sou_pedra) _img = vida_pedra >= 2 ? 0 : 1;
 if(sou_gelo or sou_colmeia or sou_gelatina) _img = 0;
+if(sou_sensor)
+{
+	//PARADO: 10 QUADROS POR SEGUNDO. REVELADO: O QUADRO DO TIRO ACOMPANHA A CONTAGEM (OS 7 PRIMEIROS; O 8O, ESCURO, FICA DE FORA)
+	if(sensor_timer < 0) _img = floor(current_time / 100) mod sprite_get_number(spr_bloco_sniper_idle);
+	else _img = clamp(floor((1 - sensor_timer / SENSOR_AVISO) * 7), 0, 6);
+}
 //O REDEMOINHO GIRANDO. RECARREGANDO (DEPOIS DE ENGOLIR) ELE GIRA DEVAGAR E VAI ACELERANDO ATE FICAR PRONTO
 var _blend = image_blend;
 if(sou_buraco)
@@ -126,7 +137,7 @@ _cor = c_white;
 		_fog_cor = c_white;
 		_fog_alpha = max(alpha_fog, .45 + .45 * sin(current_time / 35));
 	}
-	else if(pode_especial and global.energia >= 1 and alpha_fog < .3)
+	else if(pode_especial and energia_valor(x) >= 1 and alpha_fog < .3)
 	{
 		_fog_cor = #31FCFF;
 		_fog_alpha = .3 + .25 * sin(current_time / 140);
@@ -145,8 +156,8 @@ _cor = c_white;
 			draw_set_alpha(1);
 			draw_set_color(c_white);
 		}
-		_fog_cor = c_red;
-		_fog_alpha = (sensor_timer div 3) mod 2 ? .8 : .3;
+		_fog_cor = c_white;
+		_fog_alpha = (sensor_timer div 3) mod 2 ? .35 : 0;	//(A ARTE JA E VERMELHA: SO UM CLARAO BRANCO PISCANDO)
 		shake_x += choose(-1, 1);
 	}
 	
@@ -155,6 +166,24 @@ _cor = c_white;
 	gpu_set_fog(true, _fog_cor, 0, 1);
 	draw_sprite_ext(_minha_spr, _img, x + shake_x, y + shake_y, _ex, _ey, 0, _cor, _fog_alpha);
 	gpu_set_fog(false, c_white, 0, 1);
+	
+	//TEMPO PARADO, DICA: ESSE BLOCO COMPLETA UMA LINHA QUANDO CAIR (BORDA BRILHANDO)
+	if((global.tempo_fase == "parado" or global.tempo_fase == "contagem") and array_contains(global.tempo_dicas, id))
+	{
+		var _dp = .55 + .45 * sin(current_time / 110), _bx = x + shake_x, _by = y + shake_y;
+		gpu_set_blendmode(bm_add);
+		draw_set_color(#FFE600);
+		for(var k = 0; k < 3; k++)
+		{
+			draw_set_alpha(_dp * (.5 - k * .15));
+			draw_rectangle(_bx - 8 - k, _by - 8 - k, _bx + 7 + k, _by + 7 + k, true);
+		}
+		gpu_set_blendmode(bm_normal);
+		draw_set_alpha(.5 + .5 * _dp);
+		draw_set_color(c_white);
+		draw_rectangle(_bx - 8, _by - 8, _bx + 7, _by + 7, true);
+		draw_set_alpha(1);
+	}
 	
 	//PLAYER SEGURANDO BAIXO EM CIMA DA PEÇA: BRILHO E LINHAS DE VELOCIDADE SUBINDO
 	if(global.peca_acelerada_timer > 0 and (pai == global.peca_acelerada or id == global.peca_acelerada))
@@ -243,17 +272,7 @@ _cor = c_white;
 	//VISAO ESPIRITUAL: MOSTRA O SENSOR (OLHO) E O QUE O BLOCO ESPECIAL GUARDA
 	if(tem_poder("visao"))
 	{
-		if(sou_sensor and sensor_timer < 0)
-		{
-			var _pulso = .6 + .4 * sin(current_time / 150);
-			draw_set_alpha(_pulso);
-			draw_set_color(c_white);
-			draw_ellipse(x + shake_x - 5, y + shake_y - 3, x + shake_x + 5, y + shake_y + 3, false);
-			draw_set_color(#C0167A);
-			draw_circle(x + shake_x, y + shake_y, 2, false);
-			draw_set_alpha(1);
-			draw_set_color(c_white);
-		}
+		//(O SNIPER JA TEM A CARA DELE O TEMPO TODO: A VISAO ESPIRITUAL NAO PRECISA MARCAR O OLHO)
 		if(sou_especial and premio_especial >= 0)
 		{
 			var _nomes = global.linguagem == 0 ? ["PONTOS", "DEVAGAR", "+1 VIDA", "RÁPIDO", "CUBO", "BÔNUS"] : ["POINTS", "SLOW", "+1 LIFE", "FAST", "CUBE", "BONUS"];
@@ -268,7 +287,7 @@ _cor = c_white;
 	
 	//PEÇA ATUAL DA FILA (A QUE TELEPORTA): BRILHO EM VOLTA
 	//CHECANDD SE O NOSSO PAI E O INST_PECA
-	if(pai == global.peca_inst) draw_sprite_ext(spr_efeito_brilho, get_timer()/50000, x + shake_x, y + shake_y, 1, 1, 0, c_white, 1);
+	if(room == rm_versus ? versus_peca_atual(pai) : pai == global.peca_inst) draw_sprite_ext(spr_efeito_brilho, get_timer()/50000, x + shake_x, y + shake_y, 1, 1, 0, c_white, 1);	//(A ARTE NOVA DO BRILHO TEM O RISCO 3PX MAIS PRA DIREITA NO QUADRO: O -3 CENTRA NA FACE DO BLOCO)
 	//ANIMAÇAO DE QUEBRAR A IRMANDADE
 	if(anim_efeito_irmandade)
 	{

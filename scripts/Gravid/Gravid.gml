@@ -13,6 +13,6 @@ function scr_gravid(_massa = 1)
 		var _lento = variable_instance_exists(id, "lento") and lento > 0;
 		var _rapido = variable_instance_exists(id, "rapido") and rapido > 0;
 		velv += GRAVID * _massa * (_lento ? LENTO_MULT : (_rapido ? RAPIDO_MULT : 1));
-		velv = clamp(velv, -_vel_m, _vel_m);
+		velv = clamp(velv, -_vel_m, _vel_m-1);
 	}
 }

@@ -1,5 +1,5 @@
 //PAUSADO: FICA PARADO
-if(global.game_pause) exit;
+if(pausa_em(x)) exit;
 
 //ACELERA ATE 7 PIXELS POR FRAME
 vel = min(vel + .5, 7);
@@ -9,7 +9,7 @@ repeat(ceil(vel))
 {
 	x += dir;
 	
-	//ACERTOU O PLAYER: O ESCUDO SEGURA (E QUEBRA). SEM ESCUDO, MORRE
+	//ACERTOU O PLAYER: O ESCUDO SEGURA (E QUEBRA). SEM ESCUDO, LEVA O DANO
 	//PLAYER
 	var _p = instance_place(x, y, obj_player);
 	if(_p != noone and _p.estado != state.morte)
@@ -26,8 +26,7 @@ repeat(ceil(vel))
 			}
 			else
 			{
-				levar_dano(other.dir, 100); //EMPURRAO E HITSTOP (NO MODO IMORTAL SO ISSO)
-				morrer();
+				levar_dano(other.dir, 100); //O TIRO SO DA DANO (TIRA PONTOS OU UM CORAÇAO, VER OBJ_PLAYER.DANO_COBRAR)
 			}
 		}
 		sensor_explodir();

@@ -30,9 +30,10 @@ if(mostrar_msg > 0)
 }
 else alpha_msg = lerp(alpha_msg, 0, .1);
 
-alpha_conf = lerp(alpha_conf, estado == menu.config ? 1 : 0, .2);
-alpha_ranks = lerp(alpha_ranks, estado == menu.ranks ? 1 : 0, .2);
-alpha_blocos = lerp(alpha_blocos, estado == menu.blocos ? 1 : 0, .2);
+//OS PAINEIS APARECEM SUAVE, MAS SOMEM RAPIDO (SENAO FICAM POR CIMA DO MENU QUE VOLTOU)
+alpha_conf = estado == menu.config ? lerp(alpha_conf, 1, .2) : max(0, alpha_conf - .34);
+alpha_ranks = estado == menu.ranks ? lerp(alpha_ranks, 1, .2) : max(0, alpha_ranks - .34);
+alpha_blocos = estado == menu.blocos ? lerp(alpha_blocos, 1, .2) : max(0, alpha_blocos - .34);
 
 switch(estado)
 {
@@ -64,90 +65,95 @@ switch(estado)
 		alpha_title		= lerp(alpha_title, 0, .3);
 		_alpha			= lerp(_alpha, 0, .3);
 
-		var _total = sprite_get_number(spr_menu);
-
-		//MUDANDO ENTRE CONFIG (-1), MEIO (0) E CREDITOS (1)
-		var _h_antes = indice_h;
-		indice_h = clamp(indice_h + _right - _left, -1, 1);
-		if(indice_h != _h_antes) som_tocar(snd_menu_select_02);
-
-		//SUBINDO E DESCENDO NOS BOTOES DO MEIO (DA A VOLTA)
-		if(indice_h == 0 and (_up xor _down))
+		//MENU NOVO (SCR_MENU): LISTA UNICA, CARTAO EXPLICANDO A OPÇAO E MOUSE. O ANTIGO FICA ABAIXO (MENU_NOVO = FALSE)
+		if(MENU_NOVO) menu_novo_step(_up, _down, _enter, _voltar);
+		else
 		{
-			indice = (indice + _down - _up + _total) mod _total;
-			som_tocar(snd_menu_select_03);
-		}
+			var _total = sprite_get_number(spr_menu);
 
-		if(_voltar)
-		{
-			som_tocar(snd_menu_erro_02);
-			estado = menu.inicio;
-			timer_inicio = 10;
-		}
-		else if(_enter)
-		{
-			if(indice_h == -1)
+			//MUDANDO ENTRE CONFIG (-1), MEIO (0) E CREDITOS (1)
+			var _h_antes = indice_h;
+			indice_h = clamp(indice_h + _right - _left, -1, 1);
+			if(indice_h != _h_antes) som_tocar(snd_menu_select_02);
+
+			//SUBINDO E DESCENDO NOS BOTOES DO MEIO (DA A VOLTA)
+			if(indice_h == 0 and (_up xor _down))
 			{
-				som_tocar(snd_menu_select_01);
-				estado = menu.config;
-				conf_sub = noone;
-				conf_indice = 0;
-				conf_resetar_anim();
+				indice = (indice + _down - _up + _total) mod _total;
+				som_tocar(snd_menu_select_03);
 			}
-			else if(indice_h == 1)
+
+			if(_voltar)
 			{
-				som_tocar(snd_menu_select_01);
-				estado = menu.creditos;
-				creditos_y = room_height + 15;
-				alpha_img_creditos = 0;
+				som_tocar(snd_menu_erro_02);
+				estado = menu.inicio;
+				timer_inicio = 10;
 			}
-			else
+			else if(_enter)
 			{
-				switch(indice)
+				if(indice_h == -1)
 				{
-					case menu_pri.arcade:
-						som_tocar(snd_menu_select_01);
-						global.coop = false;
-						scr_trans(rm_selecao);
-						break;
-					case menu_pri.versus:
-						som_tocar(snd_menu_select_01);
-						estado = menu.versus;
-						indice_versus = 0;
-						break;
-					case menu_pri.tutorial:	//TABELA DOS BLOCOS (O QUE CADA UM FAZ)
-						som_tocar(snd_menu_select_01);
-						estado = menu.blocos;
-						blocos_sel = 0;
-						break;
-					case menu_pri.ranks:	//RECORDES DESSE COMPUTADOR (O RANKING ONLINE DO JOGO ANTIGO NAO FOI TRAZIDO)
-						som_tocar(snd_menu_select_01);
-						estado = menu.ranks;
-						break;
-					case menu_pri.steam:
-						url_open("https://store.steampowered.com/app/3495060/");
-						som_tocar(snd_certo);
-						shake_msg[indice] = 4;
-						break;
-					case menu_pri.sair:
-						jogo_salvar();
-						game_end();
-						break;
+					som_tocar(snd_menu_select_01);
+					estado = menu.config;
+					conf_sub = noone;
+					conf_indice = 0;
+					conf_resetar_anim();
+				}
+				else if(indice_h == 1)
+				{
+					som_tocar(snd_menu_select_01);
+					estado = menu.creditos;
+					creditos_y = room_height + 15;
+					alpha_img_creditos = 0;
+				}
+				else
+				{
+					switch(indice)
+					{
+						case menu_pri.arcade:
+							som_tocar(snd_menu_select_01);
+							global.coop = false;
+							scr_trans(rm_selecao);
+							break;
+						case menu_pri.versus:
+							som_tocar(snd_menu_select_01);
+							estado = menu.versus;
+							indice_versus = 0;
+							break;
+						case menu_pri.tutorial:	//TABELA DOS BLOCOS (O QUE CADA UM FAZ)
+							som_tocar(snd_menu_select_01);
+							estado = menu.blocos;
+							blocos_sel = 0;
+							break;
+						case menu_pri.ranks:	//RECORDES DESSE COMPUTADOR (O RANKING ONLINE DO JOGO ANTIGO NAO FOI TRAZIDO)
+							som_tocar(snd_menu_select_01);
+							estado = menu.ranks;
+							break;
+						case menu_pri.steam:
+							url_open("https://store.steampowered.com/app/3495060/");
+							som_tocar(snd_certo);
+							shake_msg[indice] = 4;
+							break;
+						case menu_pri.sair:
+							jogo_salvar();
+							game_end();
+							break;
+					}
 				}
 			}
-		}
 
-		//ANIMANDO OS BOTOES
-		for(var i = 0; i < _total; i++)
-		{
-			var _sel = (indice == i and indice_h == 0);
-			array_y_menu[i] = lerp(array_y_menu[i], _sel ? -2 : 0, .2);
-			array_alpha[i]	= lerp(array_alpha[i], _sel ? 1 : .5, .2);
+			//ANIMANDO OS BOTOES
+			for(var i = 0; i < _total; i++)
+			{
+				var _sel = (indice == i and indice_h == 0);
+				array_y_menu[i] = lerp(array_y_menu[i], _sel ? -2 : 0, .2);
+				array_alpha[i]	= lerp(array_alpha[i], _sel ? 1 : .5, .2);
+			}
+			array_x_menu_h[0]  = lerp(array_x_menu_h[0], indice_h == -1 ? -2 : 0, .2);
+			array_alpha_hor[0] = lerp(array_alpha_hor[0], indice_h == -1 ? 1 : .5, .2);
+			array_x_menu_h[1]  = lerp(array_x_menu_h[1], indice_h == 1 ? 2 : 0, .2);
+			array_alpha_hor[1] = lerp(array_alpha_hor[1], indice_h == 1 ? 1 : .5, .2);
 		}
-		array_x_menu_h[0]  = lerp(array_x_menu_h[0], indice_h == -1 ? -2 : 0, .2);
-		array_alpha_hor[0] = lerp(array_alpha_hor[0], indice_h == -1 ? 1 : .5, .2);
-		array_x_menu_h[1]  = lerp(array_x_menu_h[1], indice_h == 1 ? 2 : 0, .2);
-		array_alpha_hor[1] = lerp(array_alpha_hor[1], indice_h == 1 ? 1 : .5, .2);
 		break;
 	#endregion
 
@@ -171,7 +177,8 @@ switch(estado)
 			som_tocar(snd_menu_select_01);
 			//COOP: O ARCADE COM DOIS JOGADORES (OS DOIS ESCOLHEM O PERSONAGEM ANTES)
 			global.coop = indice_versus == 1;
-			scr_trans(global.coop ? rm_selecao : rm_versus);
+			global.versus_sel = !global.coop;
+			scr_trans(rm_selecao);
 		}
 		break;
 	#endregion
@@ -179,6 +186,7 @@ switch(estado)
 	#region CONFIG
 	//CONFIGURAÇOES: LISTA PRINCIPAL E OS SUBMENUS (AUDIO, CONTROLES, JOGO)
 	case menu.config:
+		if(MENU_NOVO and menu_conf_mouse()) _enter = true; //MOUSE: CLICAR NA LINHA VALE COMO ESPAÇO (SCR_MENU)
 		var _linhas = conf_linhas();
 		var _qtd = array_length(_linhas);
 
@@ -246,7 +254,8 @@ switch(estado)
 						global.full_screen = !global.full_screen;
 						window_set_fullscreen(global.full_screen);
 					}
-					else global.shake = !global.shake;
+					else if(conf_indice == 1) global.shake = !global.shake;
+					else global.mostrar_teclas = !global.mostrar_teclas;
 					som_tocar(snd_menu_select_01);
 				}
 				break;
@@ -277,6 +286,7 @@ switch(estado)
 			conf_x[i]	  = lerp(conf_x[i], _sel ? 8 : 0, .24 - i * .01);
 			conf_alpha[i] = lerp(conf_alpha[i], _sel ? 1 : .35, .2);
 		}
+		if(MENU_NOVO) menu_conf_anim(); //ANIMA O CARTAO DA DIREITA (SCR_MENU)
 		break;
 	#endregion
 

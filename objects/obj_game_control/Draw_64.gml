@@ -12,6 +12,16 @@ if(fundo_xiado != -1)
 	}
 }
 
+//AS PEÇAS FICARAM MAIS RAPIDAS: VINHETA LARANJA NA BORDA DA TELA QUE VAI SUMINDO (MESMA LUNETA DO DANO, SO QUE LARANJA)
+if(global.vel_aviso > 0)
+{
+	var _tv = gui_tela();
+	gpu_set_fog(true, #FF9A3C, 0, 1);
+	draw_sprite_stretched_ext(spr_luneta, 0, _tv[0], _tv[1], _tv[2] - _tv[0], _tv[3] - _tv[1], c_white, global.vel_aviso * .8);
+	gpu_set_fog(false, c_white, 0, 1);
+	global.vel_aviso = max(0, global.vel_aviso - .012);
+}
+
 //FLASH BRANCO SUTIL QUANDO FECHA LINHA (VAI SUMINDO SOZINHO)
 if(global.flash_linha > 0)
 {
@@ -41,14 +51,19 @@ if(global.contagem > 0 and global.andar_pausa <= 0 and instance_exists(obj_area)
 	draw_set_halign(fa_center);
 	draw_set_valign(fa_middle);
 	//TEXTO DO MOTIVO ("MAIS RAPIDO", "FEBRE"...) EM CIMA DO NUMERO
-	draw_text_transformed_color(_cx + _e, _cy - 34 * _e + _e, global.contagem_texto, _e * 1.2, _e * 1.2, 0, #0E071B, #0E071B, #0E071B, #0E071B, 1);
-	draw_text_transformed_color(_cx, _cy - 34 * _e, global.contagem_texto, _e * 1.2, _e * 1.2, 0, c_white, c_white, c_white, c_white, 1);
+	//(TEXTO COMPRIDO, COMO "ESTA FICANDO MUITO FRIO", ENCOLHE PRA CABER NA LARGURA DA ARENA)
+	var _ct = min(1.2, (obj_area.sprite_width - 6) / max(1, string_width(global.contagem_texto))) * _e;
+	draw_text_transformed_color(_cx + _e, _cy - 34 * _e + _e, global.contagem_texto, _ct, _ct, 0, #0E071B, #0E071B, #0E071B, #0E071B, 1);
+	draw_text_transformed_color(_cx, _cy - 34 * _e, global.contagem_texto, _ct, _ct, 0, c_white, c_white, c_white, c_white, 1);
 	//NUMERO COM CONTORNO
 	for(var i = 0; i < 4; i++) draw_text_transformed_color(_cx + lengthdir_x(2 * _e, i * 90), _cy + lengthdir_y(2 * _e, i * 90), string(_num), _esc, _esc, 0, #0E071B, #0E071B, #0E071B, #0E071B, 1);
 	draw_text_transformed_color(_cx, _cy, string(_num), _esc, _esc, 0, _cor, _cor, _cor, _cor, 1);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 }
+
+//EFEITO DE AMBIENTE: FRIO (VINHETA AZUL E NEVE)
+if(modo_arcade() and !modo_versus()) frio_desenhar();
 
 #region BLOCO NOVO DESCOBERTO
 //UMA PLAQUINHA DESCE NO TOPO DA ARENA COM O BLOCO GIRANDO, "NOVO BLOCO DESCOBERTO!" E O NOME. UM DE CADA VEZ
@@ -62,7 +77,8 @@ if(array_length(global.avisos_bloco) > 0 and instance_exists(obj_area))
 	var _e = gui_esc();
 	var _t = global.aviso_bloco_t;
 	var _desce = min(1, _t / 12) * min(1, (AVISO_BLOCO_DUR - _t) / 12);	//ENTRA E SAI DESLIZANDO
-	var _w = 74 * _e, _h = 26 * _e;
+	var _f = .85;	//AVISO UM POUCO MENOR (NAO FICA POR BAIXO DO PAINEL DO ZORG, QUE ENTRA PELO MESMO LADO)
+	var _w = 74 * _e * _f, _h = 26 * _e * _f;
 	var _ent = 1 - power(1 - max(0, _desce), 3);
 	//NO PC: NA AREA LIVRE DA ESQUERDA DA ARENA, ENTRANDO PELA ESQUERDA (ABAIXO DO PAINEL DO P2 NO COOP, ACIMA DO COMBO).
 	//NO CELULAR NAO SOBRA ESPAÇO DO LADO: DESCE NO TOPO DA ARENA
@@ -71,7 +87,7 @@ if(array_length(global.avisos_bloco) > 0 and instance_exists(obj_area))
 	{
 		var _cx_fim = (obj_area.x - 24) * _e - _w;
 		_cx = lerp(-_w * 1.2, _cx_fim, _ent);
-		_y1 = (obj_area.y + 88) * _e;
+		_y1 = (obj_area.y + 262) * _e;	//BEM EMBAIXO (O ZORG USA O ALTO DA ESQUERDA, E O COMBO FICA NO MEIO)
 	}
 	else
 	{
@@ -96,17 +112,17 @@ if(array_length(global.avisos_bloco) > 0 and instance_exists(obj_area))
 	gpu_set_blendmode(bm_normal);
 	//O BLOCO (DA UM PULINHO) E OS TEXTOS
 	var _pulo = abs(sin(_t / 8)) * 2 * _e;
-	bloco_icone_desenhar(_id, _cx - _w + 14 * _e, _y1 + _h / 2 + 2 * _e - _pulo, _e);
+	bloco_icone_desenhar(_id, _cx - _w + 14 * _e * _f, _y1 + _h / 2 + 2 * _e * _f - _pulo, _e * _f);
 	draw_set_font(fnt_hud);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_middle);
-	var _tx = _cx - _w + 28 * _e;
+	var _tx = _cx - _w + 28 * _e * _f;
 	var _titulo = global.linguagem == 0 ? "NOVO BLOCO DESCOBERTO!" : "NEW BLOCK FOUND!";
-	draw_text_transformed_color(_tx + _e * .5, _y1 + 8 * _e + _e * .5, _titulo, _e * .55, _e * .55, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_tx, _y1 + 8 * _e, _titulo, _e * .55, _e * .55, 0, #FFE66B, #FFE66B, #FFB21E, #FFB21E, 1);
+	draw_text_transformed_color(_tx + _e * .5, _y1 + 8 * _e * _f + _e * .5, _titulo, _e * .55 * _f, _e * .55 * _f, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_tx, _y1 + 8 * _e * _f, _titulo, _e * .55 * _f, _e * .55 * _f, 0, #FFE66B, #FFE66B, #FFB21E, #FFB21E, 1);
 	var _nome = is_undefined(_info) ? _id : _info.nome[global.linguagem == 0 ? 0 : 1];
-	draw_text_transformed_color(_tx + _e, _y1 + 18 * _e + _e, _nome, _e * .9, _e * .9, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_tx, _y1 + 18 * _e, _nome, _e * .9, _e * .9, 0, c_white, c_white, c_white, c_white, 1);
+	draw_text_transformed_color(_tx + _e, _y1 + 18 * _e * _f + _e, _nome, _e * .9 * _f, _e * .9 * _f, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_tx, _y1 + 18 * _e * _f, _nome, _e * .9 * _f, _e * .9 * _f, 0, c_white, c_white, c_white, c_white, 1);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 	draw_set_color(c_white);
@@ -150,32 +166,33 @@ if(instance_exists(obj_area))
 		draw_set_alpha(1);
 		gpu_set_blendmode(bm_normal);
 	}
-	//TEMPO PARADO: TITULO QUE ENTRA GRANDE E UM RELOGIO QUE VAI ESVAZIANDO COM OS SEGUNDOS NO MEIO
-	if(global.tempo_fase == "parado")
+	//TEMPO PARADO: TITULO QUE ENTRA GRANDE E UM RELOGIO QUE VAI ESVAZIANDO COM OS SEGUNDOS NO MEIO (BEM TRANSPARENTES PRA NAO ATRAPALHAR)
+	if(global.tempo_fase == "parado" and global.tempo_timer > TEMPO_CONTAGEM)
 	{
+		var _ta = .3;	//TRANSPARENCIA DO TITULO E DO RELOGIO
 		var _ent = max(0, 1 - global.tempo_t / 18);
 		var _te = _e * (1.3 + 1.6 * _ent * _ent);
 		var _ty = (obj_area.y + 34) * _e;
 		var _tit = _pt ? "TEMPO PARADO!" : "TIME STOP!";
-		for(var k = 0; k < 8; k++) draw_text_transformed_color(_cx + lengthdir_x(2 * _e, k * 45), _ty + lengthdir_y(2 * _e, k * 45), _tit, _te, _te, 0, _sombra, _sombra, _sombra, _sombra, 1);
-		draw_text_transformed_color(_cx, _ty, _tit, _te, _te, sin(global.tempo_t / 20) * 2, c_white, c_white, TEMPO_VERDE, TEMPO_VERDE, 1);
+		for(var k = 0; k < 8; k++) draw_text_transformed_color(_cx + lengthdir_x(2 * _e, k * 45), _ty + lengthdir_y(2 * _e, k * 45), _tit, _te, _te, 0, _sombra, _sombra, _sombra, _sombra, _ta);
+		draw_text_transformed_color(_cx, _ty, _tit, _te, _te, sin(global.tempo_t / 20) * 2, c_white, c_white, TEMPO_VERDE, TEMPO_VERDE, _ta);
 		//RELOGIO
 		var _ry = (obj_area.y + 78) * _e, _rr = 17 * _e;
 		var _resta = global.tempo_timer / TEMPO_DURACAO;
 		var _fim = global.tempo_timer <= room_speed * 3;
 		var _cor = (_fim and (global.tempo_timer div 8) mod 2 == 0) ? #FFE600 : TEMPO_VERDE;
-		draw_set_alpha(.75);
+		draw_set_alpha(.75 * _ta);
 		draw_set_color(_sombra);
 		draw_circle(_cx, _ry, _rr + 4 * _e, false);
-		draw_set_alpha(1);
+		draw_set_alpha(_ta);
 		draw_primitive_begin(pr_trianglelist);
 		var _seg = 40;
 		for(var k = 0; k < _seg * _resta; k++)
 		{
 			var _a1 = 90 - 360 * k / _seg, _a2 = 90 - 360 * min(k + 1, _seg * _resta) / _seg;
-			draw_vertex_colour(_cx, _ry, _cor, .35);
-			draw_vertex_colour(_cx + lengthdir_x(_rr, _a1), _ry + lengthdir_y(_rr, _a1), _cor, .9);
-			draw_vertex_colour(_cx + lengthdir_x(_rr, _a2), _ry + lengthdir_y(_rr, _a2), _cor, .9);
+			draw_vertex_colour(_cx, _ry, _cor, .35 * _ta);
+			draw_vertex_colour(_cx + lengthdir_x(_rr, _a1), _ry + lengthdir_y(_rr, _a1), _cor, .9 * _ta);
+			draw_vertex_colour(_cx + lengthdir_x(_rr, _a2), _ry + lengthdir_y(_rr, _a2), _cor, .9 * _ta);
 		}
 		draw_primitive_end();
 		draw_set_color(c_white);
@@ -184,11 +201,12 @@ if(instance_exists(obj_area))
 		draw_line_width(_cx, _ry, _cx + lengthdir_x(_rr * .9, _ap), _ry + lengthdir_y(_rr * .9, _ap), 1.5 * _e);
 		var _seg_txt = string(ceil(global.tempo_timer / room_speed));
 		var _ne = _e * (1.3 + (_fim ? .25 * abs(sin(global.tempo_t / 6)) : 0));
-		for(var k = 0; k < 4; k++) draw_text_transformed_color(_cx + lengthdir_x(_e, k * 90), _ry + lengthdir_y(_e, k * 90), _seg_txt, _ne, _ne, 0, _sombra, _sombra, _sombra, _sombra, 1);
-		draw_text_transformed_color(_cx, _ry, _seg_txt, _ne, _ne, 0, c_white, c_white, c_white, c_white, 1);
+		for(var k = 0; k < 4; k++) draw_text_transformed_color(_cx + lengthdir_x(_e, k * 90), _ry + lengthdir_y(_e, k * 90), _seg_txt, _ne, _ne, 0, _sombra, _sombra, _sombra, _sombra, _ta);
+		draw_text_transformed_color(_cx, _ry, _seg_txt, _ne, _ne, 0, c_white, c_white, c_white, c_white, _ta);
+		draw_set_alpha(1);
 	}
 	//CONTAGEM: 3, 2, 1 GRANDE NO MEIO DA ARENA COM UM ANEL ABRINDO A CADA SEGUNDO
-	if(global.tempo_fase == "contagem")
+	if(global.tempo_fase == "contagem" or (global.tempo_fase == "parado" and global.tempo_timer <= TEMPO_CONTAGEM))
 	{
 		var _num = ceil(global.tempo_timer / room_speed);
 		var _f = 1 - (global.tempo_timer mod room_speed) / room_speed;	//0 NO COMEÇO DE CADA SEGUNDO
@@ -367,9 +385,23 @@ if(menu_debug)
 }
 #endregion
 
+//TUTORIAL DA DONA MALHADA (CAIXA DE DIALOGO)
+tutorial_desenhar();
+
+//GUIA DA PRIMEIRA LINHA (SCR_PODERES): BRILHO LEVE NA LINHA QUE FICA EM CIMA DO CHAO + SETAS
+guia_linha_desenhar();
+
+//TIRA DE COMANDOS NO RODAPE (SCR_PODERES): AS TECLAS PASSAM DEVAGAR, CLARAS ATE O JOGADOR USAR, DEPOIS FICAM COM ALPHA .5
+teclas_desenhar();
+
+//ZORG (SCR_PODERES): NO JOGO NORMAL DESENHA AQUI (DEPOIS A TELA DE PAUSA/RESULTADO SAI CEDO). COM PAUSA/RESULTADO ELE DESENHA NO FIM, POR CIMA
+if(alpha_pause < .01 and alpha_fim < .01) zorg_desenhar();
+
 //TELA DE PAUSA E DE RESULTADO (GAME OVER)
 //TUDO E POSICIONADO EM "PIXELS DA ROOM" E MULTIPLICADO POR _E, PORQUE A GUI E MAIOR QUE A ROOM
 if(alpha_pause < .01 and alpha_fim < .01) exit;
+//VERSUS: O RESULTADO TEM A TELA PROPRIA (SCR_COOP)
+if(modo_versus() and alpha_fim > alpha_pause) { versus_resultado_desenhar(alpha_fim); exit; }
 
 //ESCALA E MEIO DA TELA. _FIM = TA MOSTRANDO O GAME OVER (SENAO E A PAUSA)
 var _gw = display_get_gui_width();
@@ -388,7 +420,7 @@ draw_set_alpha(_a);
 
 //TAMANHO DO PAINEL
 var _pw = 300;
-var _ph = _fim ? 250 : (ver_comandos ? 236 : 176);
+var _ph = _fim ? 250 : (ver_comandos ? 236 : 248);
 var _px = _cx - _pw / 2;
 var _py = gui_meio_y() - _ph / 2;
 var _th = sprite_get_height(spr_caixa_setings);
@@ -471,7 +503,7 @@ else
 	{
 		//COMANDOS: AÇAO NA ESQUERDA, TECLA NO MEIO E BOTAO DO CONTROLE NA DIREITA
 		var _pt = global.linguagem == 0;
-		var _im = global.coop ? imputs_layout(COOP_LAYOUT_P1) : global.imputs;
+		var _im = dois_players() ? imputs_layout(COOP_LAYOUT_P1) : global.imputs;
 		var _linhas = [
 			[_pt ? "AÇÃO" : "ACTION",				_pt ? "TECLADO" : "KEYBOARD",				_pt ? "CONTROLE" : "GAMEPAD"],
 			[_pt ? "ANDAR" : "MOVE",				tecla_nome(_im.left) + " / " + tecla_nome(_im.rigth),	_pt ? "ANALÓGICO / D-PAD" : "STICK / D-PAD"],
@@ -497,23 +529,30 @@ else
 			draw_text_transformed_color(_cx2 * _e, _ly * _e, _linhas[i][1], _e * .7, _e * .7, 0, _c2, _c2, _c2, _c2, _a);
 			draw_text_transformed_color(_cx3 * _e, _ly * _e, _linhas[i][2], _e * .7, _e * .7, 0, _c3, _c3, _c3, _c3, _a);
 		}
-		var _rod = global.coop ? (_pt ? "P2: SETAS + C X Z V (OU O 2º CONTROLE)" : "P2: ARROWS + C X Z V (OR 2ND GAMEPAD)") : (_pt ? "ESC / B: VOLTAR" : "ESC / B: BACK");
+		var _rod = dois_players() ? (_pt ? "P2: SETAS + C X Z V (OU O 2º CONTROLE)" : "P2: ARROWS + C X Z V (OR 2ND GAMEPAD)") : (_pt ? "ESC / B: VOLTAR" : "ESC / B: BACK");
 		draw_text_transformed_color(_cx * _e, (_y - 4 + array_length(_linhas) * 17 + 4) * _e, _rod, _e * .6, _e * .6, 0, #C7CFDD, #C7CFDD, #C7CFDD, #C7CFDD, _a);
 	}
-	var _opcoes = [texto("continuar_jogo"), global.linguagem == 0 ? "COMANDOS" : "CONTROLS", texto("reiniciar"), texto("voltar_menu")];
-	for(var i = 0; i < (ver_comandos ? 0 : 4); i++)
+	var _opcoes = [texto("continuar_jogo"), global.linguagem == 0 ? "COMANDOS" : "CONTROLS", "TUTORIAL", (global.linguagem == 0 ? "TECLAS" : "KEYS") + ": " + (global.mostrar_teclas ? (global.linguagem == 0 ? "SIM" : "ON") : (global.linguagem == 0 ? "NÃO" : "OFF")), (global.linguagem == 0 ? "TESTE DE DIFICULDADE: " : "DIFFICULTY TEST: ") + (global.teste_dif ? (global.linguagem == 0 ? "SIM" : "ON") : (global.linguagem == 0 ? "NÃO" : "OFF")), texto("reiniciar"), texto("voltar_menu")];
+	for(var i = 0; i < (ver_comandos ? 0 : 7); i++)
 	{
 		var _sel = opcao_pause == i;
 		var _bw = 160, _bh = 18;
 		draw_sprite_stretched_ext(spr_menu_confg, 0, (_cx - _bw / 2) * _e, (_y - _bh / 2) * _e, _bw * _e, _bh * _e, c_white, _a * (_sel ? 1 : .45));
 		var _c = _sel ? c_white : #92A1B9;
-		draw_text_transformed_color(_cx * _e, _y * _e, (_sel ? "> " : "") + _opcoes[i] + (_sel ? " <" : ""), _e * .9, _e * .9, 0, _c, _c, _c, _c, _a);
+		//TEXTO LONGO ENCOLHE PRA CABER NA CAIXA
+		var _txt_op = (_sel ? "> " : "") + _opcoes[i] + (_sel ? " <" : "");
+		var _esc_op = min(.9, (_bw - 12) / max(1, string_width(_txt_op)));
+		if(i == 4 and global.teste_dif) _c = _sel ? #FFE66B : #C9A93C;	//LIGADO FICA AMARELO
+		draw_text_transformed_color(_cx * _e, _y * _e, _txt_op, _e * _esc_op, _e * _esc_op, 0, _c, _c, _c, _c, _a);
 		_y += 24;
 	}
 	//DICA DO ESPECIAL
 	if(!ver_comandos) draw_text_ext_transformed_color(_cx * _e, (_y + 6) * _e, texto("dica_especial"), 12, _pw - 30, _e * .7, _e * .7, 0, c_aqua, c_aqua, c_aqua, c_aqua, _a);
 	#endregion
 }
+
+//ZORG: A FRASE MALVADA NO TOPO (SCR_PODERES). POR CIMA DE TUDO, ATE DA TELA DE RESULTADO
+zorg_desenhar();
 
 //VOLTA O PADRAO DE DESENHO
 draw_set_alpha(1);

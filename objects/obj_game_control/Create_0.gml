@@ -11,6 +11,8 @@ if(modo_arcade()) fundo_iniciar();
 //TESTE: A PARTIDA JA COMEÇA NUM LEVEL E COM UM TEMPO DE JOGO (GLOBAIS: TESTE_INICIO_*). O TEMPO LIBERA OS BLOCOS DAQUELE MINUTO
 if(modo_arcade() and !TESTE_AUTO)
 {
+	//PAUSA > TESTE DE DIFICULDADE: LEVEL 3 E 20 MINUTOS DE JOGO (PRA TODOS OS BLOCOS JA APARECEREM)
+	if(global.teste_dif and !modo_versus()) { global.level = 3; global.nivel_vel = 3; global.tempo_partida = 20 * 60; }
 	if(TESTE_INICIO_LEVEL > 1) { global.level = TESTE_INICIO_LEVEL; global.nivel_vel = TESTE_INICIO_LEVEL; }
 	if(TESTE_INICIO_MINUTOS > 0) global.tempo_partida = TESTE_INICIO_MINUTOS * 60;
 }
@@ -129,3 +131,19 @@ voltar_menu = function()
 	global.menu_principal = true;
 	scr_trans(menu_room());
 }
+
+//COMEÇOU A PARTIDA: ZERA O QUE O JOGADOR "JA DESCOBRIU" (TIRA DE COMANDOS E GUIA DA 1A LINHA, SCR_PODERES)
+if(modo_arcade()) habil_zerar();
+min_aviso = floor(global.tempo_partida / 60);	//ULTIMO MINUTO DE PARTIDA QUE JA AVISOU "PEÇAS MAIS RAPIDAS"
+
+//TUTORIAL DA DONA MALHADA (SCR_PODERES): NA 1A VEZ NO ARCADE (OU QUANDO A PAUSA PEDE). TEM QUE FICAR POR ULTIMO (SEGURA OS TIMERS DE CIMA)
+tutorial_iniciar();
+
+//ZORG, O ALIEN QUE CONTROLA A GRADE (SCR_PODERES): ZERA O ESTADO DELE NA PARTIDA
+zorg_iniciar();
+
+//AS 5 PRIMEIRAS PEÇAS DO ARCADE SAO SEMPRE AS MESMAS (CRIAR_PECAS)
+abertura_iniciar();
+
+//EFEITO DE AMBIENTE: FRIO (CRIAR_PECAS)
+frio_iniciar_partida();

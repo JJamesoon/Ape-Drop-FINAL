@@ -13,39 +13,85 @@ var _minha_linha = instance_place(x, y, obj_linha);
 
 //DRAW_SPRITE(SPR_LINHA, 1, _MINHA_LINHA.X, _MINHA_LINHA.Y);
 
-//DENTRO DA ARENA: UM PRETO MEIO TRANSPARENTE POR CIMA DA PAREDE DE AZULEJOS (IGUAL AO PROJETO ANTIGO), PROS BLOCOS APARECEREM
-if(modo_arcade())
+//FUNDO DA ARENA (O DE CADA MODO FICA NO CREATE DO OBJ_AREA OU DO FILHO)
+desenhar_fundo(shake_x, shake_y);
+
+
+
+//TEMPO PARADO, PREVIA DA QUEDA: UM FEIXE DE LUZ VERDE SAINDO DE BAIXO DOS BLOCOS QUE VAO CAIR, SUMINDO NA PONTA (POR BAIXO DOS BLOCOS)
+if(global.tempo_fase == "parado" or global.tempo_fase == "contagem")
 {
-	draw_set_alpha(FUNDO_ARENA);
-	draw_set_color(c_black);
-	draw_rectangle(x + shake_x, y + shake_y, x + sprite_width - 1 + shake_x, y + sprite_height - 1 + shake_y, false);
+	var _pulso = .8 + .2 * sin(current_time / 180);
+	gpu_set_blendmode(bm_add);
+	for(var i = 0; i < array_length(global.tempo_rastros); i++)
+	{
+		var _r = global.tempo_rastros[i], _fx = _r[0] + shake_x, _t = _r[1] + CEL / 2 + shake_y, _b = _r[2] + shake_y;
+		if(_b <= _t) continue;
+		//HALO LARGO E NUCLEO FINO, OS DOIS SUMINDO PRA BAIXO
+		draw_primitive_begin(pr_trianglestrip);
+		draw_vertex_colour(_fx - 7, _t, TEMPO_VERDE, .22 * _pulso);
+		draw_vertex_colour(_fx + 7, _t, TEMPO_VERDE, .22 * _pulso);
+		draw_vertex_colour(_fx - 7, _b, TEMPO_VERDE, 0);
+		draw_vertex_colour(_fx + 7, _b, TEMPO_VERDE, 0);
+		draw_primitive_end();
+		draw_primitive_begin(pr_trianglestrip);
+		draw_vertex_colour(_fx - 2.3, _t, c_white, .4 * _pulso);
+		draw_vertex_colour(_fx + 2.3, _t, c_white, .4 * _pulso);
+		draw_vertex_colour(_fx - 2.3, _b, TEMPO_VERDE, 0);
+		draw_vertex_colour(_fx + 2.3, _b, TEMPO_VERDE, 0);
+		draw_primitive_end();
+	}
+	gpu_set_blendmode(bm_normal);
+}
+
+//TELEPORTE DO TEMPO PARADO: DE CADA BLOCO SAI UM FEIXE VERDE; NO LUGAR DE ONDE ELE SAIU FICA UMA SOMBRA VERDE QUE VAI SUMINDO
+for(var i = array_length(global.tempo_sombras) - 1; i >= 0; i--)
+{
+	var _s = global.tempo_sombras[i];
+	var _t = 1 - _s.idade / TEMPO_SOMBRA_VIDA;
+	if(_t <= 0) { array_delete(global.tempo_sombras, i, 1); continue; }
+	_s.idade++;
+	var _sx = _s.x + shake_x, _s0 = _s.y0 + shake_y, _s1 = _s.y1 + shake_y;
+	//SOMBRA NO LUGAR DE ONDE O BLOCO SAIU: SILHUETA VERDE, BRILHO E UM CONTORNO QUE ABRE
+	if(sprite_exists(_s.spr))
+	{
+		gpu_set_fog(true, TEMPO_VERDE, 0, 1);
+		draw_sprite_ext(_s.spr, _s.img, _sx, _s0, 1, 1, 0, c_white, .8 * _t);
+		gpu_set_fog(false, c_white, 0, 1);
+	}
+	gpu_set_blendmode(bm_add);
+	draw_set_color(TEMPO_VERDE);
+	draw_set_alpha(.4 * _t);
+	draw_rectangle(_sx - 8, _s0 - 8, _sx + 7, _s0 + 7, false);
+	var _ab = (1 - _t) * 6;
+	draw_set_alpha(.8 * _t);
+	draw_rectangle(_sx - 8 - _ab, _s0 - 8 - _ab, _sx + 7 + _ab, _s0 + 7 + _ab, true);
 	draw_set_alpha(1);
 	draw_set_color(c_white);
-}
-
-//FUNDO DA ARENA
-if(modo_arcade()) borda_desenhar(spr_borda, 0, x + shake_x, y + shake_y, sprite_width - sprite_get_width(spr_area));
-else draw_sprite(spr_borda_vesus, 0, x + shake_x, y + shake_y);
-
-
-
-//DETECTANDO LINHAS COMPLETAS (TODAS AS CELULAS DA LINHA COM 1 NA GRID)
-//A LIMPEZA (EFEITO, PONTOS, CHAO E CONTAGEM DO ANDAR) FICA NO LIMPAR_LINHAS() DO CREATE
-var _linhas = [];
-for(var j = 0; j < lins; j++)
-{
-	var _completa = true;
-	for(var i = 0; i < cols; i++)
+	//FEIXE: FORTE NO BLOCO (LUGAR NOVO) E AFINANDO ATE A SOMBRA
+	var _w = 8 * (.5 + .5 * _t);
+	draw_primitive_begin(pr_trianglestrip);
+	draw_vertex_colour(_sx - _w, _s1, TEMPO_VERDE, .7 * _t);
+	draw_vertex_colour(_sx + _w, _s1, TEMPO_VERDE, .7 * _t);
+	draw_vertex_colour(_sx - _w, _s0, TEMPO_VERDE, .25 * _t);
+	draw_vertex_colour(_sx + _w, _s0, TEMPO_VERDE, .25 * _t);
+	draw_primitive_end();
+	gpu_set_blendmode(bm_normal);
+	//COPIAS DO BLOCO PELO CAMINHO, MAIS FRACAS QUANTO MAIS LONGE DELE
+	if(sprite_exists(_s.spr))
 	{
-		if(global.grid[# i, j] != 1)
+		gpu_set_fog(true, TEMPO_VERDE, 0, 1);
+		for(var k = 1; k <= 4; k++)
 		{
-			_completa = false;
-			break;
+			var _f = k / 5;
+			draw_sprite_ext(_s.spr, _s.img, _sx, lerp(_s1, _s0, _f), 1, 1, 0, c_white, .5 * _t * (1 - _f));
 		}
+		gpu_set_fog(false, c_white, 0, 1);
 	}
-	if(_completa) array_push(_linhas, j);
 }
-if(timer_reset == 0 and array_length(_linhas) > 0) limpar_linhas(_linhas);
+
+//LINHAS COMPLETAS (CADA MODO TEM A SUA DETECÇAO: DETECTAR_LINHAS)
+detectar_linhas();
 
 //CODIGO ANTIGO DESLIGADO: O QUEBRA-CABEÇA ANTIGO DAS SETAS COM ESPINHOS NAS LATERAIS
 ////ESTADO DE AREA FANTASMA COM ESPINHOS

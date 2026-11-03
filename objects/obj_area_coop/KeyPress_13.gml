@@ -1,2 +1,2 @@
-//PRA TESTAR NO COOP: ENTER CRIA UMA PEÇA NA HORA
-criar_bloco();
+//DO COOP: USA O DO OBJ_AREA
+event_inherited();

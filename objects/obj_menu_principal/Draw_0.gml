@@ -19,7 +19,7 @@ if(estado == menu.inicio)
 #endregion
 
 #region MENU PRINCIPAL
-if(estado == menu.principal)
+if(estado == menu.principal and !MENU_NOVO)
 {
 	//BOTOES DO MEIO UM EMBAIXO DO OUTRO (O SELECIONADO SOBE UM POUCO E FICA ACESO)
 	var _marg = 3;
@@ -57,6 +57,10 @@ draw_sprite_ext(spr_bg_made_in, 0, _centro_x, room_height - 8, 1, 1, 0, c_white,
 draw_sprite_ext(spr_bg_press, 0, _centro_x + 1, room_height - 115 + 1, 1, 1, 0, _sombra, _alpha);
 draw_sprite_ext(spr_bg_press, 0, _centro_x, room_height - 115, 1, 1, 0, c_white, _alpha);
 
+//MENU NOVO (SCR_MENU): POR CIMA DOS BLOCOS DE DECORAÇAO
+if(MENU_NOVO and estado == menu.principal) menu_novo_draw();
+if(MENU_NOVO and estado == menu.config) menu_conf_draw(); //CONFIGURAÇOES NO MESMO ESTILO (SCR_MENU)
+
 draw_set_font(fnt_hud);
 
 #region VERSAO (TELA DE TITULO)
@@ -87,7 +91,7 @@ if(estado == menu.versus)
 #endregion
 
 #region CONFIGURAÇOES
-if(alpha_conf > .01)
+if(alpha_conf > .01 and !MENU_NOVO)
 {
 	//LINHAS DA TELA DE CONFIGURAÇAO ATUAL E O TITULO DO PAINEL
 	var _linhas = conf_linhas();
@@ -159,7 +163,7 @@ if(alpha_conf > .01)
 				draw_text_color(_vx, _y, _valor, c_white, c_white, c_white, c_white, alpha_conf);
 				break;
 			case menu_conf.jogo:
-				var _ligado = i == 0 ? global.full_screen : global.shake;
+				var _ligado = i == 0 ? global.full_screen : (i == 1 ? global.shake : global.mostrar_teclas);
 				draw_sprite_ext(spr_menu_certo, _ligado, _vx, _vy, .5, .5, 0, c_white, _a);
 				break;
 		}
@@ -180,7 +184,6 @@ if(alpha_ranks > .01)
 	var _itens = [
 		[global.linguagem == 0 ? "RECORDE ARCADE" : "ARCADE RECORD", string(global.record_1)],
 		[global.linguagem == 0 ? "RECORDE COOP" : "COOP RECORD", string(global.record_coop)],
-		[global.linguagem == 0 ? "MOEDAS" : "COINS", string(global.moedas)],
 		[global.linguagem == 0 ? "TEMPO JOGADO" : "TIME PLAYED", _tempo],
 	];
 	var _qtd = array_length(_itens);
@@ -331,7 +334,8 @@ if(alpha_msg > .01)
 #endregion
 
 #region DICAS DE TECLA (CANTO DE BAIXO)
-if(estado != menu.inicio and estado != menu.creditos)
+if(MENU_NOVO) menu_dicas_estado(); //BARRA NOVA (SCR_MENU)
+else if(estado != menu.inicio and estado != menu.creditos)
 {
 	draw_set_font(fnt_hud);
 	draw_set_halign(fa_right);

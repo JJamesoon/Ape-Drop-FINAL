@@ -11,14 +11,15 @@ esvaziar_grid();
 
 //PONTOS: BLOCO QUEBRADO PELO PLAYER (OS DAS LINHAS SAO SOMADOS NO OBJ_EFEITO_LINE, UM TEXTO POR LINHA)
 //(PONTOS_MULT: NO GIRO NO AR, CADA QUIQUE SEGUIDO SEM PISAR NO CHAO MULTIPLICA)
-if(destruido_por == "player") pontos_somar((sou_fantasma ? PONTOS_FANTASMA : PONTOS_BLOCO_PLAYER) * global.level * pontos_mult, x, y - 8, c_yellow, .8);
+var _dono = variable_instance_exists(id, "vs_dono") ? vs_dono : -1; //VERSUS: QUEM QUEBROU
+if(destruido_por == "player") pontos_somar((sou_fantasma ? PONTOS_FANTASMA : PONTOS_BLOCO_PLAYER) * global.level * pontos_mult, x, y - 8, c_yellow, .8, _dono);
 
 //GIRO DE FOGO: QUEBRADO POR UM PLAYER GIRANDO EM FOGO, VALE GIRO_FOGO_PONTOS A MAIS
 if(destruido_por == "player")
 {
 	var _fogo = false;
 	with(obj_player) if(estado == state.giro and em_fogo()) _fogo = true;
-	if(_fogo) pontos_somar(GIRO_FOGO_PONTOS, x, y - 20, c_orange, .6);
+	if(_fogo) pontos_somar(GIRO_FOGO_PONTOS, x, y - 20, c_orange, .6, _dono);
 }
 
 //ESPINHOS DO QUEBRA-CABEÇA E EXPLOSAO DA BOMBA: O BLOCO QUEBRADO TIRA PONTOS EM VEZ DE DAR (CASTIGO)

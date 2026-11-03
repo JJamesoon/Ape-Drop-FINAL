@@ -1,2 +1,2 @@
-//PRA TESTAR NO VERSUS: ENTER CRIA UMA PEÇA NA HORA
-criar_bloco();
+//DO VERSUS: USA O DO OBJ_AREA
+event_inherited();

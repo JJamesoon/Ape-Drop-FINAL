@@ -1,5 +1,5 @@
 //PAUSADO: A BALA FICA PARADA
-if(global.game_pause) exit;
+if(pausa_em(x)) exit;
 
 //ACELERA SUAVE ATE A VELOCIDADE
 velh = lerp(velh, vel, .2);

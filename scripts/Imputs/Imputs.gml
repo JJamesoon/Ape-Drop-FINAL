@@ -45,6 +45,13 @@ trocar_comandos(global.meus_imputs);
 #macro COOP_LAYOUT_P2	1
 function imputs_jogador(_n)
 {
+	if(room == rm_versus)
+	{
+		//VERSUS: P1 = LAYOUT 01, P2 = LAYOUT 02. OS DOIS TEM SUA FILA DE TELEPORTE, ENTAO O DO P2 NAO PODE SER O ESPAÇO: VAI NO V
+		var _l = imputs_layout(_n == 2 ? COOP_LAYOUT_P2 : COOP_LAYOUT_P1);
+		if(_n == 2) _l.acelerar = ord("V");
+		return _l;
+	}
 	if(!global.coop) return global.imputs;
 	return imputs_layout(_n == 2 ? COOP_LAYOUT_P2 : COOP_LAYOUT_P1);
 }
@@ -124,8 +131,8 @@ function gamepad_atualizar()
 		var _l = pad_lados(_p);
 		if(_partida)
 		{
-			//NA PARTIDA: O 1O CONTROLE E O P1 E O 2O E O P2 (SO NO COOP)
-			if(n == 1 and !global.coop) break;
+			//NA PARTIDA: O 1O CONTROLE E O P1 E O 2O E O P2 (SO NO COOP E NO VERSUS)
+			if(n == 1 and !dois_players()) break;
 			var _im = imputs_jogador(n + 1);
 			_marca(_quer, _im.left, _l.esq);
 			_marca(_quer, _im.rigth, _l.dir);
@@ -135,8 +142,18 @@ function gamepad_atualizar()
 			_marca(_quer, _im.soco, gamepad_button_check(_p, gp_face3));
 			_marca(_quer, _im.dash, gamepad_button_check(_p, gp_face4));
 			_marca(_quer, _im.soco_press, gamepad_button_check(_p, gp_shoulderr));
-			_marca(_quer, global.imputs.acelerar, gamepad_button_check(_p, gp_shoulderl) or gamepad_button_check(_p, gp_shoulderrb));
-			_marca(_quer, TEMPO_TECLA, gamepad_button_check(_p, gp_shoulderlb) or gamepad_button_check(_p, gp_select));
+			_marca(_quer, _im.acelerar, gamepad_button_check(_p, gp_shoulderl) or gamepad_button_check(_p, gp_shoulderrb));
+			_marca(_quer, room == rm_versus ? versus_tecla_poder(n + 1) : TEMPO_TECLA, gamepad_button_check(_p, gp_shoulderlb) or gamepad_button_check(_p, gp_select));
+			_marca(_quer, vk_escape, gamepad_button_check(_p, gp_start));
+		}
+		else if(global.versus_sel and room == rm_selecao)
+		{
+			//SELEÇAO DO VERSUS: O 1O CONTROLE E O P1 (A D J K) E O 2O E O P2 (SETAS C X)
+			var _k = versus_sel_teclas(n + 1);
+			_marca(_quer, _k[0], _l.esq);
+			_marca(_quer, _k[1], _l.dir);
+			_marca(_quer, _k[2], gamepad_button_check(_p, gp_face1));
+			_marca(_quer, _k[4], gamepad_button_check(_p, gp_face2));
 			_marca(_quer, vk_escape, gamepad_button_check(_p, gp_start));
 		}
 		else

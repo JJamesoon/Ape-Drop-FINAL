@@ -1,5 +1,9 @@
-//PAUSADO: FICA PARADO
-if(global.game_pause) exit;
+//PAUSADO: FICA PARADO (NO TEMPO PARADO O PLAYER AINDA PISA, ENCOSTA E LEVA DANO. SE MORREU, A MORTE CONTINUA ANIMANDO)
+if(pausa_em(x))
+{
+	if(!tempo_player_livre()) exit;
+	if(vivo()) { checar_player(); exit; }
+}
 
 //O BRILHO E O SQUASH/STRETCH VOLTAM AO NORMAL (MENOS NO AMASSADO, QUE FICA ACHATADO)
 if(estado != "aviso") alpha_fog = max(0, alpha_fog - .08);

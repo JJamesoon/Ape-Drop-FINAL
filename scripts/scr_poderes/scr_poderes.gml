@@ -199,6 +199,8 @@ function letras_reiniciar()
 	var _n = array_length(global.letras_nomes);
 	global.letras = array_create(_n, false);
 	global.letra_pop = array_create(_n, 1);
+	global.letras2 = array_create(_n, false);	//COOP: AS LETRAS DO PLAYER 2
+	global.letra_pop2 = array_create(_n, 1);
 	//AS LETRAS QUE TAVAM NA ARENA SAO DA PALAVRA ANTIGA
 	with(obj_letra) instance_destroy();
 	with(obj_peca) letra = -1;
@@ -213,10 +215,23 @@ function letra_intervalo()
 	return LETRA_INTERVALO * (1 + (_n - 1) * LETRA_RARIDADE);
 }
 
-//PEGOU TODAS AS LETRAS?
-function letras_completas()
+//AS LETRAS DE UM JOGADOR (1 OU 2). NO COOP CADA UM TEM A SUA PALAVRA; NO ARCADE SO EXISTE O 1
+function letras_de(_n)
 {
-	for(var i = 0; i < array_length(global.letras); i++) if(!global.letras[i]) return false;
+	return _n == 2 ? global.letras2 : global.letras;
+}
+
+//O "POP" DAS LETRAS NO HUD DE UM JOGADOR
+function letra_pop_de(_n)
+{
+	return _n == 2 ? global.letra_pop2 : global.letra_pop;
+}
+
+//O JOGADOR _N PEGOU TODAS AS LETRAS?
+function letras_completas(_n = 1)
+{
+	var _l = letras_de(_n);
+	for(var i = 0; i < array_length(_l); i++) if(!_l[i]) return false;
 	return true;
 }
 
@@ -226,7 +241,8 @@ function letra_sortear()
 	var _opcoes = [];
 	for(var i = 0; i < array_length(global.letras); i++)
 	{
-		if(global.letras[i]) continue;
+		//NO COOP A LETRA SO SAI SE ALGUM DOS DOIS AINDA NAO TEM
+		if(global.letras[i] and (!global.coop or global.letras2[i])) continue;
 		var _ja = false;
 		with(obj_letra) if(letra == i) _ja = true;
 		with(obj_peca) if(letra == i) _ja = true;
@@ -288,16 +304,23 @@ function letra_aparecer()
 	letra_criar(_a.x + 24 + random(_a.sprite_width - 48), _a.y + 40 + random(_a.sprite_height * .5), _i);
 }
 
-//PEGOU UMA LETRA
-function letra_coletar(_i, _x, _y)
+//O JOGADOR _N PEGOU UMA LETRA. SE ELE JA TEM ESSA LETRA, ELA VIRA UMA MOEDA (NO COOP CADA UM TEM AS SUAS)
+function letra_coletar(_i, _x, _y, _n = 1)
 {
-	if(global.letras[_i]) exit;
-	global.letras[_i] = true;
-	global.letra_pop[_i] = 2;
+	var _l = letras_de(_n);
+	if(_l[_i])
+	{
+		moeda_criar(_x, _y, 1);
+		efeito_texto(global.linguagem == 0 ? "VIROU MOEDA!" : "TURNED INTO A COIN!", _x, _y - 10, c_yellow, .9);
+		som_tocar(snd_coin);
+		exit;
+	}
+	_l[_i] = true;
+	letra_pop_de(_n)[_i] = 2;
 	//CADA LETRA PEGA TOCA A NOTA SEGUINTE (A PALAVRA VAI "SUBINDO"). COMPLETOU: JINGLE DO PODER
 	var _pegas = 0;
-	for(var k = 0; k < array_length(global.letras); k++) if(global.letras[k]) _pegas++;
-	if(letras_completas()) som_tocar(snd_jingle_poder);
+	for(var k = 0; k < array_length(_l); k++) if(_l[k]) _pegas++;
+	if(letras_completas(_n)) som_tocar(snd_jingle_poder);
 	else som_nota(4 + _pegas, .7);
 	onda_choque(_x, _y, 34, 3, 18);
 	efeito_texto(global.letras_nomes[_i], _x, _y - 10, c_yellow, 1.4);
@@ -307,9 +330,12 @@ function letra_coletar(_i, _x, _y)
 //O JOGO TODO PARA (A TELA FICA VERDE COM ANEIS DE RELOGIO) E SO O PLAYER SE MEXE POR TEMPO_DURACAO: DA PRA QUEBRAR E EMPURRAR
 //BLOCOS, MAS NADA CAI. DEPOIS VEM A CONTAGEM DE 3S E TODOS OS BLOCOS SOLTOS CAEM DE UMA VEZ (DE BAIXO PRA CIMA), ENCAIXANDO
 //DO JEITO QUE O JOGADOR ARRUMOU. O CONTROLE CHAMA O TEMPO_ATUALIZAR; O DESENHO FICA NO DRAW_64 E NO DRAW_77 DO OBJ_GAME_CONTROL
-#macro TEMPO_DURACAO	(room_speed * 20)	//TEMPO COM TUDO PARADO (DEPOIS VEM A CONTAGEM DE 3S, ONDE O PLAYER AINDA ANDA)
+#macro TEMPO_DURACAO	(room_speed * 25)	//TEMPO COM TUDO PARADO (DEPOIS VEM A CONTAGEM DE 3S, ONDE O PLAYER AINDA ANDA)
 #macro TEMPO_CONTAGEM	(room_speed * 3)
 #macro TEMPO_TECLA		ord("1")
+#macro TEMPO_VEL_EXTRA	.5		//VELOCIDADE A MAIS DO PLAYER ANDANDO NO TEMPO PARADO
+#macro TEMPO_FEIXE		74		//COMPRIMENTO MAXIMO (PX) DO FEIXE DE LUZ DA PREVIA DA QUEDA, SAINDO DE BAIXO DE CADA BLOCO
+#macro TEMPO_SOMBRA_VIDA	50		//FRAMES QUE O FEIXE E A SOMBRA VERDE DO TELEPORTE DEMORAM PRA SUMIR
 #macro TEMPO_VERDE		#3CFF8C
 
 //O PLAYER PODE ANDAR AGORA? (TEMPO PARADO OU NA CONTAGEM, E NENHUMA PAUSA DE VERDADE)
@@ -324,11 +350,11 @@ function tempo_ativo()
 	return global.tempo_fase != "";
 }
 
-//APERTOU 1 COM A ENERGIA CHEIA: PARA O TEMPO (GASTA TODA A ENERGIA)
+//APERTOU 1 COM A ENERGIA CHEIA: PARA O TEMPO (A ENERGIA ESVAZIA COM O TEMPO)
 function tempo_parar()
 {
-	global.energia = 0;
-	global.tempo_fase = "parado";
+	habil_aprender("tempo");
+	global.tempo_fase = "parado"; //A ENERGIA VAI ESVAZIANDO SOZINHA ENQUANTO O TEMPO ESTA PARADO (TEMPO_ATUALIZAR)
 	global.tempo_timer = TEMPO_DURACAO;
 	global.tempo_t = 0;
 	global.tempo_flash = 1;
@@ -339,7 +365,87 @@ function tempo_parar()
 	shakes(10, 3);
 	audio_play_sound(snd_feitico, 2, false, 1, 0, .55);
 	audio_play_sound(zap1, 1, false, .8, 0, .5);
-	with(obj_player) { alpha_fog = 1; esc_x = 1.4 * image_xscale; esc_y = .7; }
+	with(obj_player)
+	{
+		alpha_fog = 1; esc_x = 1.4 * image_xscale; esc_y = .7;
+		if(!tem_poder("asas")) efeito_texto(global.linguagem == 0 ? "PULO DUPLO!" : "DOUBLE JUMP!", x, y - 30, TEMPO_VERDE, 1.2);
+	}
+}
+
+//COMEÇA A QUEDA: TODOS OS BLOCOS SOLTOS SE TELEPORTAM DE UMA VEZ PRO LUGAR ONDE VAO FICAR (IGUAL AO TELEPORTE DAS PEÇAS)
+function tempo_iniciar_queda()
+{
+	global.tempo_fase = "queda";
+	global.tempo_flash = .8;
+	global.tempo_dicas = [];
+	global.tempo_rastros = [];
+	global.tempo_sombras = [];
+	//ENCAIXA TODO MUNDO NA GRADE
+	with(obj_peca) if(destruido_por == noone)
+	{
+		x = grid_alinhar_x(prox_x);
+		prox_x = x;
+		y = grid_alinhar_y_cima(y);
+		gel_quicando = false;
+		tempo_q = 0;
+	}
+	var _plano = tempo_simular_queda();
+	var _moveu = 0;
+	for(var g = 0; g < array_length(_plano); g++)
+	{
+		var _m = _plano[g].m, _q = _plano[g].q;
+		if(_q <= 0) continue;
+		//TOPO E FUNDO DE CADA COLUNA DO GRUPO (UM RASTRO DE TELEPORTE POR COLUNA)
+		var _topos = {}, _fundos = {};
+		for(var i = 0; i < array_length(_m); i++)
+		{
+			with(_m[i])
+			{
+				esvaziar_grid();
+				var _y0 = y;
+				var _k = string(x);
+				if(!variable_struct_exists(_topos, _k) or y < _topos[$ _k]) _topos[$ _k] = y;
+				y += _q;
+				if(!variable_struct_exists(_fundos, _k) or y > _fundos[$ _k]) _fundos[$ _k] = y;
+				//FEIXE E SOMBRA VERDE SAINDO DESSE BLOCO (DESENHADOS NO OBJ_AREA)
+				array_push(global.tempo_sombras, { x : x, y0 : _y0, y1 : y, spr : variable_instance_exists(id, "ult_spr") ? ult_spr : spr_peca, img : variable_instance_exists(id, "ult_img") ? ult_img : 0, idade : 0 });
+				prox_y = y + CEL;
+				velv = 0;
+				velh = 0;
+				andar = false;
+				estou_parado = false;
+				timer_move = meu_timer;
+				inicializando = 0;
+				esc = 1.2;
+				alpha_fog = 1;
+			}
+		}
+		//IMPACTO NO CHAO DE CADA COLUNA (O FEIXE E A SOMBRA VERDE SAEM DE CADA BLOCO: VER TEMPO_SOMBRAS)
+		var _ks = variable_struct_get_names(_fundos);
+		for(var i = 0; i < array_length(_ks); i++)
+		{
+			var _im = instance_create_depth(real(_ks[i]), _fundos[$ _ks[i]] + CEL / 2, -1800, obj_efeito_pontos);
+			_im.modo = "tele";
+			_im.y_chao = _im.y;
+		}
+		_moveu++;
+	}
+	if(_moveu > 0)
+	{
+		tempo_tirar_player();
+		audio_play_sound(snd_acelerar_peca, 1, false, .8, 0, 1);
+		shakes(8, 2);
+	}
+	som_tocar(snd_certo);
+	audio_play_sound(snd_feitico, 2, false, 1, 0, 1.3);
+	if(instance_exists(obj_area)) onda_choque(obj_area.x + obj_area.sprite_width / 2, obj_area.y + obj_area.sprite_height / 2, 220, 8, 40);
+}
+
+//APERTOU 1 DE NOVO COM O TEMPO PARADO: ENCERRA ANTES, SEM A CONTAGEM (OS BLOCOS CAEM NA HORA). A ENERGIA QUE SOBROU FICA GUARDADA
+function tempo_encerrar()
+{
+	if(global.tempo_fase != "parado") exit;
+	tempo_iniciar_queda();
 }
 
 //BLOCOS DE UM GRUPO (A PEÇA INTEIRA, OU SO O BLOCO SE ELE TA SOZINHO)
@@ -367,37 +473,9 @@ function tempo_ocupado(_x, _y, _membros)
 	return _ocupado;
 }
 
-//FIM DA CONTAGEM: ENCAIXA TODO MUNDO NA GRADE E FAZ A LISTA DOS GRUPOS, DO MAIS BAIXO PRO MAIS ALTO
-function tempo_preparar_queda()
+//QUANTO O GRUPO CAIRIA (EM PIXELS) DA POSICAO ALINHADA ATUAL, SEM MEXER NELE
+function tempo_queda_de(_m)
 {
-	with(obj_peca) if(destruido_por == noone)
-	{
-		x = grid_alinhar_x(prox_x);
-		prox_x = x;
-		y = grid_alinhar_y_cima(y);
-		gel_quicando = false;
-	}
-	var _grupos = [];
-	with(obj_peca) if(destruido_por == noone)
-	{
-		var _l = (irmandade and instance_exists(pai)) ? pai : id;
-		if(!array_contains(_grupos, _l)) array_push(_grupos, _l);
-	}
-	//FUNDO DE CADA GRUPO (O Y DO BLOCO MAIS BAIXO)
-	var _fundo = function(_l) { var _m = tempo_membros(_l), _f = -infinity; for(var i = 0; i < array_length(_m); i++) _f = max(_f, _m[i].y); return _f; };
-	array_sort(_grupos, method({ f : _fundo }, function(_a, _b) { return f(_b) - f(_a); }));
-	global.tempo_queda = _grupos;
-	global.tempo_moveu = false;
-}
-
-//DERRUBA O PROXIMO GRUPO DA LISTA ATE ONDE ELE CABE (COM RASTRO VERDE E O CLARAO NO CHAO). DEVOLVE SE CAIU
-function tempo_derrubar_proximo()
-{
-	if(array_length(global.tempo_queda) == 0 or !instance_exists(obj_area)) return false;
-	var _l = global.tempo_queda[0];
-	array_delete(global.tempo_queda, 0, 1);
-	var _m = tempo_membros(_l);
-	if(array_length(_m) == 0) return false;
 	var _limite = obj_area.y + obj_area.sprite_height;
 	var _queda = 0;
 	repeat(40)
@@ -405,50 +483,156 @@ function tempo_derrubar_proximo()
 		var _prox = _queda + CEL, _livre = true;
 		for(var i = 0; i < array_length(_m) and _livre; i++)
 		{
-			if(_m[i].y + _prox > _limite or tempo_ocupado(_m[i].x, _m[i].y + _prox, _m)) _livre = false;
+			var _yy = grid_alinhar_y_cima(_m[i].y) + _prox;
+			if(_yy > _limite or tempo_ocupado(grid_alinhar_x(_m[i].x), _yy, _m)) _livre = false;
 		}
 		if(!_livre) break;
 		_queda = _prox;
 	}
-	if(_queda <= 0) return false;
-	//TOPO E FUNDO DE CADA COLUNA (UM RASTRO POR COLUNA)
-	var _topos = {}, _fundos = {};
-	for(var i = 0; i < array_length(_m); i++)
+	return _queda;
+}
+
+//DICA: QUAIS GRUPOS COMPLETAM UMA LINHA SE CAIREM DO JEITO QUE TAO (A BORDA DELES BRILHA NO TEMPO PARADO)
+function tempo_dica_calcular()
+{
+	var _res = [];
+	global.tempo_dicas = _res;
+	if(!instance_exists(obj_area)) exit;
+	var _grupos = [];
+	with(obj_peca) if(destruido_por == noone)
 	{
-		with(_m[i])
+		var _l = (irmandade and instance_exists(pai)) ? pai : id;
+		if(!array_contains(_grupos, _l)) array_push(_grupos, _l);
+	}
+	for(var g = 0; g < array_length(_grupos); g++)
+	{
+		var _m = tempo_membros(_grupos[g]);
+		var _q = tempo_queda_de(_m);
+		//LINHAS (Y) E CASAS (X,Y) QUE O GRUPO OCUPA QUANDO POUSAR
+		var _casas = [], _ys = [];
+		for(var i = 0; i < array_length(_m); i++)
 		{
-			esvaziar_grid();
-			var _k = string(x);
-			if(!variable_struct_exists(_topos, _k) or y < _topos[$ _k]) _topos[$ _k] = y;
-			y += _queda;
-			if(!variable_struct_exists(_fundos, _k) or y > _fundos[$ _k]) _fundos[$ _k] = y;
-			prox_y = y + CEL;
-			velv = 0;
-			velh = 0;
-			andar = false;
-			estou_parado = false;
-			timer_move = meu_timer;
-			inicializando = 0;
-			esc = 1.2;
-			alpha_fog = 1;
+			var _cy = grid_alinhar_y_cima(_m[i].y) + _q, _cx = grid_alinhar_x(_m[i].x);
+			array_push(_casas, [_cx, _cy]);
+			if(!array_contains(_ys, _cy)) array_push(_ys, _cy);
+		}
+		var _completa = false;
+		for(var r = 0; r < array_length(_ys) and !_completa; r++)
+		{
+			var _cheia = true;
+			for(var j = 0; j < obj_area.cols and _cheia; j++)
+			{
+				var _px = obj_area.x + CEL / 2 + j * CEL, _meu = false;
+				for(var c = 0; c < array_length(_casas); c++) if(_casas[c][0] == _px and _casas[c][1] == _ys[r]) { _meu = true; break; }
+				if(!_meu and !tempo_ocupado(_px, _ys[r], _m)) _cheia = false;
+			}
+			_completa = _cheia;
+		}
+		if(_completa) for(var i = 0; i < array_length(_m); i++) array_push(_res, _m[i]);
+	}
+	global.tempo_dicas = _res;
+}
+
+//SIMULA A QUEDA: ONDE CADA GRUPO VAI PARAR (OS DE BAIXO PRIMEIRO, ATE NINGUEM MAIS MEXER). NAO MEXE EM NADA DE VERDADE:
+//GUARDA AS POSICOES, ENCAIXA NA GRADE, "CAI" NA CONTA E DEVOLVE TUDO. DEVOLVE UM ARRAY DE { m : BLOCOS DO GRUPO, q : PIXELS QUE CAI }
+function tempo_simular_queda()
+{
+	var _salvo = [];
+	with(obj_peca) if(destruido_por == noone) array_push(_salvo, [id, x, y]);
+	for(var i = 0; i < array_length(_salvo); i++)
+	{
+		with(_salvo[i][0])
+		{
+			x = grid_alinhar_x(prox_x);
+			y = grid_alinhar_y_cima(y);
 		}
 	}
-	var _ks = variable_struct_get_names(_topos);
-	for(var i = 0; i < array_length(_ks); i++)
+	var _grupos = [];
+	with(obj_peca) if(destruido_por == noone)
 	{
-		var _rx = real(_ks[i]);
-		var _r = instance_create_depth(_rx, _topos[$ _ks[i]] - CEL / 2, -1700, obj_efeito_animacao);
-		_r.sprite_index = spr_efeito_teleporte;
-		_r.image_yscale = _queda / sprite_get_height(spr_efeito_teleporte);
-		_r.image_blend = TEMPO_VERDE;
-		var _im = instance_create_depth(_rx, _fundos[$ _ks[i]] + CEL / 2, -1800, obj_efeito_pontos);
-		_im.modo = "tele";
-		_im.y_chao = _im.y;
+		var _l = (irmandade and instance_exists(pai)) ? pai : id;
+		if(!array_contains(_grupos, _l)) array_push(_grupos, _l);
 	}
-	audio_play_sound(snd_acelerar_peca, 1, false, .5, 0, .9 + random(.4));
-	shakes(3, 1);
-	global.tempo_moveu = true;
-	return true;
+	var _res = [];
+	for(var g = 0; g < array_length(_grupos); g++) array_push(_res, { m : tempo_membros(_grupos[g]), q : 0 });
+	//DE BAIXO PRA CIMA. UM GRUPO PODE LIBERAR OUTRO, ENTAO REPETE ATE NINGUEM MAIS MEXER
+	var _fundo = function(_r) { var _f = -infinity; for(var i = 0; i < array_length(_r.m); i++) _f = max(_f, _r.m[i].y); return _f; };
+	repeat(6)
+	{
+		var _moveu = false;
+		array_sort(_res, method({ f : _fundo }, function(_a, _b) { return f(_b) - f(_a); }));
+		for(var g = 0; g < array_length(_res); g++)
+		{
+			var _q = tempo_queda_de(_res[g].m);
+			if(_q <= 0) continue;
+			for(var i = 0; i < array_length(_res[g].m); i++) _res[g].m[i].y += _q;
+			_res[g].q += _q;
+			_moveu = true;
+		}
+		if(!_moveu) break;
+	}
+	for(var i = 0; i < array_length(_salvo); i++)
+	{
+		_salvo[i][0].x = _salvo[i][1];
+		_salvo[i][0].y = _salvo[i][2];
+	}
+	return _res;
+}
+
+//GUARDA EM CADA BLOCO QUANTO ELE VAI CAIR (TEMPO_Q) E MONTA OS RASTROS DA PREVIA: UM FEIXE DE LUZ POR COLUNA SO NOS BLOCOS QUE CAEM NO CHAO, SEM UM SOBREPOR O OUTRO
+function tempo_planejar()
+{
+	with(obj_peca) tempo_q = 0;
+	var _plano = tempo_simular_queda();
+	var _cols = {};
+	for(var g = 0; g < array_length(_plano); g++)
+	{
+		if(_plano[g].q <= 0) continue;
+		for(var i = 0; i < array_length(_plano[g].m); i++)
+		{
+			var _b = _plano[g].m[i];
+			_b.tempo_q = _plano[g].q;
+			var _y1 = grid_alinhar_y_cima(_b.y);
+			//SO OS BLOCOS QUE CAEM DIRETO NO BLOCO CHAO (OBJ_BLOCK) GANHAM FEIXE: ELES AJUDAM A FECHAR A LINHA PRINCIPAL
+			var _k = string(grid_alinhar_x(_b.prox_x));
+			var _fx = real(_k), _fy = _y1 + _plano[g].q;
+			if(!collision_rectangle(_fx - 4, _fy + CEL - 4, _fx + 4, _fy + CEL + 4, obj_block, false, true)) continue;
+			if(!variable_struct_exists(_cols, _k)) _cols[$ _k] = [];
+			array_push(_cols[$ _k], [_y1, _y1 + min(_plano[g].q, TEMPO_FEIXE)]); //O FEIXE NAO PRECISA IR ATE O FIM
+		}
+	}
+	//JUNTA OS TRECHOS DA MESMA COLUNA QUE SE ENCOSTAM/SOBREPOEM (VIRA UMA LINHA SO)
+	var _rastros = [];
+	var _ks = variable_struct_get_names(_cols);
+	for(var c = 0; c < array_length(_ks); c++)
+	{
+		var _t = _cols[$ _ks[c]];
+		array_sort(_t, function(_a, _b) { return _a[0] - _b[0]; });
+		var _ini = _t[0][0], _fim = _t[0][1];
+		for(var i = 1; i < array_length(_t); i++)
+		{
+			if(_t[i][0] <= _fim) _fim = max(_fim, _t[i][1]);
+			else { array_push(_rastros, [real(_ks[c]), _ini, _fim]); _ini = _t[i][0]; _fim = _t[i][1]; }
+		}
+		array_push(_rastros, [real(_ks[c]), _ini, _fim]);
+	}
+	global.tempo_rastros = _rastros;
+}
+
+//PLAYER EMBAIXO DE UM BLOCO QUE CAIU: SOBE ELE PRA CIMA DA PEÇA (SENAO FICA PRESO DENTRO E LEVA DANO)
+function tempo_tirar_player()
+{
+	with(obj_player)
+	{
+		var _eu = id, _n = 0, _preso = true;
+		while(_preso and _n < 400)
+		{
+			_preso = false;
+			with(obj_peca) if(!sou_fantasma and destruido_por == noone and place_meeting(x, y, _eu)) _preso = true;
+			if(_preso) { _eu.y--; _n++; }
+		}
+		if(_n > 0) { velv = 0; esc_x = .8 * image_xscale; esc_y = 1.25; }
+	}
 }
 
 //RODA TODO FRAME NO OBJ_GAME_CONTROL (MENOS NA PAUSA DE VERDADE): CONTA O TEMPO, A CONTAGEM E FAZ A QUEDA
@@ -456,48 +640,1512 @@ function tempo_atualizar()
 {
 	if(global.tempo_fase == "") exit;
 	global.tempo_t++;
+	if(global.tempo_t mod 6 == 1 and (global.tempo_fase == "parado" or global.tempo_fase == "contagem")) { tempo_planejar(); tempo_dica_calcular(); }
 	desafio_segurar(true); //NADA NASCE NEM ANDA (OS ALARMES FICAM SEGURADOS)
 	switch(global.tempo_fase)
 	{
 		case "parado":
 			global.tempo_timer--;
+			global.energia = max(0, global.energia - ENERGIA_MAX / TEMPO_DURACAO); //A BARRA ESVAZIA ATE ZERAR NO FIM DO TEMPO
 			//TIQUE DO RELOGIO A CADA SEGUNDO (MAIS FORTE NOS 3 ULTIMOS)
 			if(global.tempo_timer > 0 and global.tempo_timer mod room_speed == 0) audio_play_sound(Bip_2, 1, false, global.tempo_timer <= room_speed * 3 ? .8 : .35, 0, .7);
-			if(global.tempo_timer <= 0)
-			{
-				global.tempo_fase = "contagem";
-				global.tempo_timer = TEMPO_CONTAGEM;
-				som_tocar(Bip_2);
-			}
+			//(A CONTAGEM 3, 2, 1 APARECE NOS ULTIMOS 3S DO TEMPO PARADO: NO DRAW_64)
+			if(global.tempo_timer <= 0) tempo_iniciar_queda();
 			break;
 		case "contagem":
 			global.tempo_timer--;
 			if(global.tempo_timer > 0 and global.tempo_timer mod room_speed == 0) som_tocar(Bip_2);
 			if(global.tempo_timer <= 0)
 			{
-				global.tempo_fase = "queda";
-				global.tempo_passadas = 0;
-				global.tempo_flash = .8;
-				tempo_preparar_queda();
-				som_tocar(snd_certo);
-				audio_play_sound(snd_feitico, 2, false, 1, 0, 1.3);
-				if(instance_exists(obj_area)) onda_choque(obj_area.x + obj_area.sprite_width / 2, obj_area.y + obj_area.sprite_height / 2, 220, 8, 40);
+				tempo_iniciar_queda();
 			}
 			break;
 		case "queda":
-			//DOIS GRUPOS POR FRAME, DE BAIXO PRA CIMA (UMA CASCATA). ACABOU A LISTA: SE ALGUEM CAIU, PASSA DE NOVO (ATE 4 VEZES)
-			var _caiu = 0;
-			while(_caiu < 2 and array_length(global.tempo_queda) > 0) if(tempo_derrubar_proximo()) _caiu++;
-			if(array_length(global.tempo_queda) == 0)
+			//OS BLOCOS JA SE TELEPORTARAM (TEMPO_INICIAR_QUEDA): O JOGO VOLTA E AS LINHAS FECHADAS CONTAM NA HORA
+			global.tempo_fase = "";
+			shakes(12, 3);
+			with(obj_area) alarm[0] = max(alarm[0], room_speed);
+			break;
+	}
+}
+
+//==================== GUIA DO JOGADOR (SEM TUTORIAL) ====================
+//NAO TEM TUTORIAL: O JOGO GUIA O JOGADOR DE DOIS JEITOS DISCRETOS.
+//1) TIRA DE COMANDOS NO RODAPE (TECLAS_DESENHAR, NO DRAW_64): AS TECLAS DAS AÇOES PASSAM DEVAGAR PRA UM LADO, SEMPRE. AS QUE O
+//   JOGADOR AINDA NAO USOU FICAM CLARAS (ALPHA 1); QUANDO ELE USA UMA, ELA DA UMA PISCADINHA DE "DESCOBERTA" E FICA COM ALPHA .5
+//   NA PARTIDA (O HISTORICO ZERA TODA VEZ QUE UMA PARTIDA COMEÇA: HABIL_ZERAR). ASSIM ELE SEMPRE ENCONTRA A TECLA SE ESQUECER.
+//   DA PRA LIGAR/DESLIGAR A TIRA NAS CONFIGURAÇOES E NA PAUSA (GLOBAL.MOSTRAR_TECLAS).
+//2) GUIA DA PRIMEIRA LINHA (GUIA_LINHA_DESENHAR): ENQUANTO O JOGADOR NUNCA FECHOU UMA LINHA, A LINHA QUE FICA EM CIMA DO CHAO BRILHA
+//   DE LEVE, COM UMA SETA DE CADA LADO APONTANDO PRA ELA. DEPOIS DA 1A LINHA FECHADA (NA PARTIDA) SOME.
+
+//O JOGADOR JA SABE FAZER ISSO?
+function habil_ok(_id)
+{
+	return global.habil[$ _id];
+}
+
+//APRENDEU (SO VALE NA PARTIDA ATUAL). GUARDA A HORA PRA TECLA DA TIRA DAR A PISCADINHA
+function habil_aprender(_id)
+{
+	if(global.habil[$ _id]) return;
+	global.habil[$ _id] = true;
+	global.habil_t[$ _id] = current_time;
+}
+
+//COMEÇOU UMA PARTIDA: ZERA O QUE O JOGADOR "JA DESCOBRIU" (AS TECLAS DA TIRA VOLTAM A FICAR CLARAS E O GUIA DA 1A LINHA VOLTA)
+function habil_zerar()
+{
+	var _n = variable_struct_get_names(global.habil);
+	for(var i = 0; i < array_length(_n); i++) global.habil[$ _n[i]] = false;
+	global.habil_t = {};
+}
+
+//RODA TODO FRAME NO STEP DO PLAYER (FORA DE PAUSA): ANOTA O QUE ELE JA FEZ
+function ensino_player_atualizar()
+{
+	if(abs(velh) > .5 or keyboard_check_pressed(imp.left) or keyboard_check_pressed(imp.rigth)) habil_aprender("mover");
+	if(estado == state.jump and velv < -1.5) habil_aprender("pulou");
+	if(estado == state.soco) habil_aprender("socou");
+	if(estado == state.super_soco) habil_aprender("soco_forte");
+	if(estado == state.giro) habil_aprender("girou");
+	if(giro_lat) habil_aprender("giro_lat");
+}
+
+//--------------------- GUIA DA PRIMEIRA LINHA ---------------------
+//ENQUANTO O JOGADOR NUNCA FECHOU UMA LINHA NA PARTIDA: A LINHA QUE FICA EM CIMA DO CHAO BRILHA DE LEVE E UMA SETA DE CADA LADO
+//APONTA PRA ELA. (O CHAO SOBE A CADA LINHA QUE CONTA NO ANDAR, ENTAO A LINHA E: LINHAS DA ARENA - 1 - LINHAS COMPLETADAS.)
+//DESENHADO NA GUI (DRAW_64) PRA FICAR POR CIMA DE TUDO. FICA ESCONDIDO NA PAUSA, NO TEMPO PARADO E NO COOP
+function guia_linha_desenhar()
+{
+	if(habil_ok("linha") or global.tutorial or !modo_arcade() or modo_versus() or global.coop or MOBILE or !instance_exists(obj_area) or tempo_ativo()) exit;
+	var _a = obj_area;
+	var _e = gui_esc();
+	var _linha = _a.lins - 1 - global.linhas_completadas;
+	if(_linha < 0) exit;
+	var _cy = _a.y + CEL / 2 + _linha * CEL;
+	var _x1 = _a.x, _x2 = _a.x + _a.sprite_width;
+	var _pulso = .5 + .5 * sin(current_time / 260);
+
+	//BRILHO LEVE NA LINHA INTEIRA (SOMA DE LUZ, BEM FRACO)
+	gpu_set_blendmode(bm_add);
+	draw_set_color(TEMPO_VERDE);
+	draw_set_alpha(.06 + .07 * _pulso);
+	draw_rectangle(_x1 * _e, (_cy - CEL / 2) * _e, _x2 * _e, (_cy + CEL / 2) * _e, false);
+	draw_set_alpha(.2 + .2 * _pulso);
+	draw_rectangle(_x1 * _e, (_cy - CEL / 2) * _e, _x2 * _e, (_cy - CEL / 2 + 1) * _e, false);
+	draw_rectangle(_x1 * _e, (_cy + CEL / 2 - 1) * _e, _x2 * _e, (_cy + CEL / 2) * _e, false);
+	gpu_set_blendmode(bm_normal);
+
+	//SETAS: UMA DE CADA LADO DA ARENA, APONTANDO PRA LINHA E BALANÇANDO DEVAGAR
+	var _bal = sin(current_time / 200) * 2;
+	draw_set_alpha(.55 + .35 * _pulso);
+	draw_set_color(TEMPO_VERDE);
+	//ESQUERDA (APONTA PRA DIREITA)
+	var _ax = _x1 - 6 + _bal;
+	draw_triangle((_ax - 8) * _e, (_cy - 6) * _e, (_ax - 8) * _e, (_cy + 6) * _e, _ax * _e, _cy * _e, false);
+	//DIREITA (APONTA PRA ESQUERDA)
+	_ax = _x2 + 6 - _bal;
+	draw_triangle((_ax + 8) * _e, (_cy - 6) * _e, (_ax + 8) * _e, (_cy + 6) * _e, _ax * _e, _cy * _e, false);
+	draw_set_alpha(1);
+	draw_set_color(c_white);
+}
+
+//--------------------- TIRA DE COMANDOS (RODAPE) ---------------------
+//DESENHA A TIRA NO RODAPE DA TELA (GUI). CHAMADO NO DRAW_64 DO OBJ_GAME_CONTROL. SO NO ARCADE SOLO NO PC
+function teclas_desenhar()
+{
+	if(!global.mostrar_teclas or global.tutorial or !modo_arcade() or modo_versus() or global.coop or MOBILE) exit;
+	var _e = gui_esc();
+	var _i = global.imputs;
+	var _pt = global.linguagem == 0;
+	//[HABILIDADE (PRA SABER SE JA DESCOBRIU), TECLA]
+	var _itens = [
+		["mover",		tecla_nome(_i.left) + " " + tecla_nome(_i.rigth)],
+		["pulou",		tecla_nome(_i.jump)],
+		["socou",		tecla_nome(_i.soco)],
+		["soco_forte",	tecla_nome(_i.soco_press)],
+		["girou",		tecla_nome(_i.giro)],
+		["teleporte",	tecla_nome(_i.acelerar)],
+	];
+	draw_set_font(fnt_hud);
+	draw_set_valign(fa_middle);
+	var _esc = .55;
+	//LARGURA DE CADA TECLA E POSIÇAO DELA NA ESTEIRA (30PX ENTRE UMA E OUTRA). A ESTEIRA E UM CIRCULO MAIOR QUE A TELA: CADA TECLA
+	//QUE SOME NA ESQUERDA JA REAPARECE NA DIREITA (NENHUMA REPETIDA NA TELA)
+	var _larg = [], _pos = [], _total = 0;
+	for(var k = 0; k < array_length(_itens); k++)
+	{
+		var _kw = max(12, string_width(_itens[k][1]) * _esc + 8);
+		array_push(_larg, _kw);
+		array_push(_pos, _total);
+		_total += _kw + 30;
+	}
+	var _volta = max(room_width + 60, _total);
+	//FAIXA ESCURA FININHA ATRAS (FICA NO RODAPE DA TELA, NAO COBRE A ARENA)
+	var _yc = 396;
+	draw_set_color(#0E071B);
+	draw_set_alpha(.55);
+	draw_rectangle(0, (_yc - 8) * _e, room_width * _e, (_yc + 9) * _e, false);
+	draw_set_alpha(1);
+	//ANDA DEVAGAR PRA ESQUERDA (18 PX POR SEGUNDO)
+	var _desloc = current_time * 0.018;
+	for(var k = 0; k < array_length(_itens); k++)
+	{
+		var _id = _itens[k][0];
+		var _sabe = global.habil[$ _id];
+		//AINDA NAO DESCOBRIU: ALPHA 1. DESCOBRIU: PISCADINHA (UM CLARAO QUE VAI SUMINDO) E FICA COM .5 PRA SEMPRE
+		var _al = 1;
+		var _pop = 0;
+		if(_sabe)
+		{
+			_al = .5;
+			if(variable_struct_exists(global.habil_t, _id))
 			{
-				if(global.tempo_moveu and global.tempo_passadas < 4) { global.tempo_passadas++; tempo_preparar_queda(); }
+				_pop = max(0, 1 - (current_time - global.habil_t[$ _id]) / 700);
+				_al = .5 + .5 * _pop;
+			}
+		}
+		var _kw = _larg[k];
+		var _x = ((_pos[k] - _desloc) mod _volta + _volta) mod _volta - _kw - 20;
+		var _kx = _x + _kw / 2;
+		//TECLA: QUADRADINHO ESCURO, CONTORNO E O TEXTO (CRESCE UM POUCO NA PISCADA)
+		var _g = _pop * 2;
+		draw_set_color(#1B1038);
+		draw_set_alpha(_al);
+		draw_rectangle((_x - _g) * _e, (_yc - 6 - _g) * _e, (_x + _kw + _g) * _e, (_yc + 6 + _g) * _e, false);
+		draw_set_color(_sabe ? c_white : TEMPO_VERDE);
+		draw_rectangle((_x - _g) * _e, (_yc - 6 - _g) * _e, (_x + _kw + _g) * _e, (_yc + 6 + _g) * _e, true);
+		draw_set_alpha(1);
+		draw_set_halign(fa_center);
+		draw_text_transformed_color(_kx * _e, _yc * _e, _itens[k][1], _e * _esc, _e * _esc, 0, c_white, c_white, c_white, c_white, _al);
+	}
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	draw_set_color(c_white);
+	draw_set_alpha(1);
+}
+
+//==================== TUTORIAL DA DONA MALHADA ====================
+//A PRIMEIRA VEZ QUE O JOGADOR ENTRA NO ARCADE (E SEMPRE QUE ESCOLHER "TUTORIAL" NA PAUSA) ROLA O TUTORIAL ANTES DA PARTIDA DE VERDADE:
+//	1) CENA: O MACACO CAI DO CEU, FICA ESMAGADINHO NO CHAO E DA UM PULINHO. AI COMEÇA.
+//	2) A VAQUINHA (DONA MALHADA) FALA POR UMA CAIXA DE DIALOGO NO LADO ESQUERDO DA ARENA E MANDA FAZER UMA COISA DE CADA VEZ:
+//	   ANDAR -> PULAR -> SOCAR/EMPURRAR UM BLOCO -> QUEBRAR UM BLOCO -> FECHAR A LINHA DE BAIXO (E POR QUE FECHAR LINHAS)
+//	3) NO FIM, A PARTIDA REINICIA DE VERDADE.
+//NESSA FASE NADA NASCE SOZINHO (SO O QUE O TUTORIAL MANDA NASCER), O PLAYER NAO MORRE NEM PERDE VIDA.
+//COMO FUNCIONA:
+//	GLOBAL.TUTORIAL = TRUE SO ENQUANTO ELE ESTA RODANDO. O OBJ_GAME_CONTROL CHAMA TUTORIAL_INICIAR (CREATE), TUTORIAL_ATUALIZAR (STEP) E
+//	TUTORIAL_DESENHAR (DRAW GUI). O QUE O TUTORIAL SEGURA FICA NO TUTORIAL_INICIAR / OBJ_AREA ALARM 0 / OS "IF(GLOBAL.TUTORIAL)" ESPALHADOS.
+//	TODO O TEXTO E AS ETAPAS FICAM EM TUTORIAL_PASSOS (MUDAR PIADA OU ORDEM E SO MEXER LA).
+//	ENTER AVANÇA A FALA. SEGURAR TAB POR 1S PULA O TUTORIAL. "FEITO" FICA SALVO (GLOBAL.TUTORIAL_FEITO).
+//A ARTE DA VACA AINDA NAO EXISTE: VACA_RETRATO DESENHA UMA VACA SIMPLES POR CODIGO. QUANDO A SPRITE "SPR_VACA_PERFIL" EXISTIR NO PROJETO
+//(UM FRAME POR EXPRESSAO, 60X60, IGUAL AOS PERFIS DOS PERSONAGENS) ELA ENTRA SOZINHA NO LUGAR DESSE DESENHO.
+//PRA TIRAR O TUTORIAL SEM APAGAR CODIGO: TUTORIAL_ATIVO = FALSE (O JOGO VOLTA A SER EXATAMENTE COMO ANTES).
+#macro TUTORIAL_ATIVO	true
+#macro TUT_ESC			.6		//TAMANHO DO TEXTO DA CAIXA DE DIALOGO
+#macro TUT_LARGURA		170		//LARGURA (PX DA ROOM) DA AREA DO TEXTO
+#macro TUT_VEL_TEXTO	.8		//LETRAS POR FRAME NA MAQUINA DE ESCREVER
+#macro TUT_PULAR_FRAMES	60		//FRAMES SEGURANDO TAB PRA PULAR O TUTORIAL
+
+global.tutorial = false;		//ESTA NO TUTORIAL AGORA?
+global.tut_trava = false;		//O PLAYER NAO RESPONDE AOS COMANDOS (CENA DO MACACO CAINDO)
+global.tut_linha = false;		//FECHOU UMA LINHA (MARCADO NO OBJ_AREA)
+global.tut_quebrou = false;		//QUEBROU UM BLOCO (MARCADO NO BLOCO_GOLPE)
+global.tut_sem_fraco = false;	//TREINO DE UM GOLPE SO: SOCO FRACO TRAVADO (O OBJ_PLAYER LE ISSO)
+global.tut_sem_forte = false;	//SOCO FORTE TRAVADO
+global.tut_sem_giro = false;		//GIRO TRAVADO
+
+//TECLAS DO JOGADOR NO TEXTO: {PULAR}, {SOCAR} (SOCO FRACO), {FORTE} (SOCO FORTE), {GIRO}, {SHIFT}, {ESQ}, {DIR}, {BAIXO}, {ESPACO} VIRAM O NOME DA TECLA DO LAYOUT ATUAL
+function tutorial_teclas(_txt)
+{
+	var _i = global.imputs;
+	_txt = string_replace_all(_txt, "{PULAR}",	tecla_nome(_i.jump));
+	_txt = string_replace_all(_txt, "{SOCAR}",	tecla_nome(_i.soco));
+	_txt = string_replace_all(_txt, "{GIRO}",	tecla_nome(_i.giro));
+	_txt = string_replace_all(_txt, "{FORTE}",	tecla_nome(_i.soco_press));
+	_txt = string_replace_all(_txt, "{SHIFT}",	"SHIFT");
+	_txt = string_replace_all(_txt, "{ESQ}",	tecla_nome(_i.left));
+	_txt = string_replace_all(_txt, "{DIR}",	tecla_nome(_i.rigth));
+	_txt = string_replace_all(_txt, "{BAIXO}",	tecla_nome(_i.down));
+	_txt = string_replace_all(_txt, "{ESPACO}",	tecla_nome(_i.acelerar));
+	return heroi_texto(_txt);	//E O NOME DO PERSONAGEM ESCOLHIDO
+}
+
+//QUEBRA O TEXTO EM LINHAS QUE CABEM NA CAIXA (PRA MAQUINA DE ESCREVER NAO FICAR PULANDO PALAVRA DE LINHA)
+function tutorial_quebrar(_txt)
+{
+	draw_set_font(fnt_hud);
+	var _palavras = string_split(_txt, " ");
+	var _linha = "", _res = "";
+	for(var i = 0; i < array_length(_palavras); i++)
+	{
+		var _t = _linha == "" ? _palavras[i] : _linha + " " + _palavras[i];
+		if(string_width(_t) * TUT_ESC > TUT_LARGURA and _linha != "")
+		{
+			_res += _linha + "\n";
+			_linha = _palavras[i];
+		}
+		else _linha = _t;
+	}
+	return _res + _linha;
+}
+
+//==================== O ROTEIRO ====================
+//CADA ETAPA:	FALAS	= [[CARA DA VACA, TEXTO], ...] (CARA: 0 NORMAL, 1 GRITANDO, 3 MACHUCADA, 4 ORGULHOSA)
+//				ACAO	= O QUE NASCE NA ARENA ("" NADA, "empurrar", "peca", "quebrar", "giro_lat", "linha")
+//				META	= O QUE O JOGADOR TEM QUE FAZER ("" NENHUMA, "mover", "pular", "empurrar", "empurrar_peca", "quebrar", "giro_lat", "linha")
+//				OBJ		= TEXTO CURTO DO OBJETIVO (FAIXA VERDE) / LEMBRETE = O QUE APARECE NA CAIXA DEPOIS QUE A FALA ACABA
+//				ELOGIO	= [CARA, TEXTO] DEPOIS DE CUMPRIR
+//				LIVRE	= (OPCIONAL) TRUE: SEM ENTER NA ULTIMA FALA, O JOGADOR JA FAZ A TAREFA ENQUANTO ELA APARECE (A ACAO NASCE NA FALA ACAO_EM, PADRAO = A ULTIMA)
+//				ACAO_EM	= (OPCIONAL, ETAPA COM ENTER) EM QUAL FALA A ACAO NASCE ANTES DO FIM (EX: A LINHA NA FALA "OLHA LA EMBAIXO")
+//				BLOQ	= (OPCIONAL) GOLPES TRAVADOS NA ETAPA, EX: "forte giro" (OPCOES: fraco, forte, giro)
+//TECLAS NO TEXTO: {ESQ} {DIR} {PULAR} {SOCAR} (SOCO FRACO) {FORTE} (SOCO FORTE) {GIRO} {SHIFT} {ESPACO}
+function tutorial_passos()
+{
+	return [
+		//BOAS VINDAS (DEPOIS DA CENA DA QUEDA)
+		{
+			falas : [
+				[1, "VOCÊ CHEGOU, O NOSSO CAMPEÃO!"],
+				[0, "IMAGINO QUE SEJA SUA PRIMEIRA VEZ NO CORPO DO GRANDE CAMPEÃO BIG RED, ENTÃO VOU TE AJUDAR A SE VIRAR."],
+				[0, "PRA VOCÊ SOBREVIVER NESSA JAULA DE BLOCOS, TEM QUE SER RÁPIDO, FORTE E INTELIGENTE. ENTÃO NÃO SUBESTIME A JAULA... DIZEM QUE ELA É VIVA."],
+			],
+			acao : "", meta : "", obj : "", lembrete : "", elogio : undefined,
+		},
+		//ANDAR
+		{
+			falas : [ [0, "LIÇÃO 1: ACHO QUE ANDAR VOCÊ JÁ SABE, MAS SÓ PRA GARANTIR, AQUI ESTÃO {ESQ} E {DIR}."] ],
+			acao : "", meta : "mover", livre : true,
+			obj : "ANDE PARA OS DOIS LADOS",
+			lembrete : "APERTE {ESQ} E {DIR} PARA ANDAR.",
+			elogio : [4, "ÓTIMO! ANDAR VOCÊ JÁ SABE, QUE LEGAL."],
+		},
+		//PULAR
+		{
+			falas : [ [0, "LIÇÃO 2: AGORA PULE O MAIS ALTO QUE PUDER!"] ],
+			acao : "", meta : "pular", livre : true,
+			obj : "PULE!",
+			lembrete : "APERTE {PULAR} PARA PULAR.",
+			elogio : [1, "MUUITO BEM! QUASE CHEGOU NA LUA."],
+		},
+		//SOCO FRACO: EMPURRAR UM BLOCO (SOCO FORTE E GIRO TRAVADOS)
+		{
+			falas : [
+				[0, "LIÇÃO 3: SOCAR E EMPURRAR! OS BLOCOS PODEM SER EMPURRADOS PRO LADO COM O SOCO ({SOCAR})."],
+				[0, "BLOCOS SÃO DIFERENTES DE PEÇAS: O SEU SOCO FRACO EMPURRA OS BLOCOS E O FORTE MOVE TUDO EM SUA FRENTE."],
+			],
+			acao : "empurrar", meta : "empurrar", livre : true, bloq : "forte giro",
+			obj : "EMPURRE O BLOCO COM O SOCO FRACO ({SOCAR})",
+			lembrete : "ENCOSTE NO BLOCO E APERTE {SOCAR}. CADA SOCO EMPURRA UMA CASA.",
+			elogio : [4, "BOA! VOCÊ VAI FAZER ISSO MUITAS VEZES AÍ DENTRO."],
+		},
+		//SOCO FORTE: EMPURRAR UMA PEÇA INTEIRA (SOCO FRACO E GIRO TRAVADOS)
+		{
+			falas : [
+				[0, "LIÇÃO 3.5: LEMBRA DO SEU SOCO FORTE E PODEROSO? ELE EMPURRA UMA PEÇA COMPLETA."],
+				[0, "FAÇA ISSO AGORA: MOVA ESSA PEÇA INTEIRA COM SEU SOCO ESMAGADOR."],
+			],
+			acao : "peca", meta : "empurrar_peca", livre : true, bloq : "fraco giro",
+			obj : "EMPURRE A PEÇA COM O SUPER SOCO ({FORTE})",
+			lembrete : "ENCOSTE NA PEÇA E APERTE {FORTE}. ELA ANDA INTEIRA.",
+			elogio : [4, "EXCELENTE, VOCÊ É MAIS FORTE DO QUE EU IMAGINAVA."],
+		},
+		//GIRAR E QUEBRAR
+		{
+			falas : [
+				[0, "LIÇÃO 4: QUEBRAR! TEM OUTRO BLOCO. GIRE ENCOSTADO NELE COM {GIRO}."],
+				[0, "DICA DE PROFESSORA: PULE E GIRE EM CIMA DELE NO AR. VOCÊ QUEBRA E AINDA QUICA PRA CIMA!"],
+			],
+			acao : "quebrar", meta : "quebrar", livre : true, acao_em : 0,
+			obj : "QUEBRE O BLOCO COM O GIRO",
+			lembrete : "GIRE COM {GIRO} PERTO DO BLOCO, OU PULE E GIRE EM CIMA DELE.",
+			elogio : [1, "CRASH! EXCELENTE, ISSO EM CONJUNTO VIRA UM CAOS. USE AO SEU FAVOR."],
+		},
+		//GIRO LATERAL (SHIFT NO AR)
+		{
+			falas : [
+				[0, "LIÇÃO 5: UM TRUQUE NO GIRO QUE VOCÊ PRECISA SABER."],
+				[0, "DICA DE PROFESSORA: PULE, SEGURE O {SHIFT} E GIRE. VOCÊ VAI PRO LADO COMO UM CANHÃO E QUEBRA A PEÇA NA LATERAL."],
+			],
+			acao : "giro_lat", meta : "giro_lat", livre : true,
+			obj : "PULE + {SHIFT} + {GIRO} PRO LADO",
+			lembrete : "TENTE AGORA: SEGURE {SHIFT}, PULE E GIRE PRA UM LADO.",
+			elogio : [1, "OK, EU SEI QUE PODE PARECER DIFÍCIL, MAS É ISSO QUE O TORNA TÃO ÚTIL."],
+		},
+		//FECHAR LINHA (E POR QUE)
+		{
+			falas : [
+				[0, "AGORA O MAIS IMPORTANTE: POR QUE COMPLETAR LINHAS?"],
+				[1, "PORQUE UMA LINHA CHEIA, DE PONTA A PONTA, FICA SÓLIDA E DÁ PONTOS!"],
+				[0, "COMBINANDO DIVERSAS LINHAS, DÁ PRA DUPLICAR OS PONTOS COM COMBOS. SE A PILHA ENCOSTAR NO TOPO, É FIM DE JOGO."],
+				[0, "OLHA LÁ EMBAIXO: FALTA UM BURACO NA LINHA, E TEM UM BLOCO CAINDO. EMPURRE ELE COM O SOCO ({SOCAR}) ATÉ CAIR NO BURACO."],
+				[0, "SEM PACIÊNCIA? {ESPACO} TELEPORTA O BLOCO DIRETO PRO CHÃO."],
+			],
+			acao : "linha", meta : "linha", acao_em : 3, obj : "FECHE A LINHA DE BAIXO",
+			lembrete : "SOQUE ({SOCAR}) O BLOCO PRO LADO ATÉ ELE CAIR NO BURACO VERDE. {ESPACO} FAZ ELE CAIR NA HORA.",
+			elogio : [4, "ISSO! LINHA COMPLETA! É LEGAL GANHAR PONTOS, NÉ? É VICIANTE: É SÓ FAZER ISSO ATÉ CANSAR."],
+		},
+		//RESUMO E DESPEDIDA
+		{
+			falas : [
+				[0, "RESUMINDO: BLOCOS CAEM, VOCÊ ORGANIZA, COMPLETA AS LINHAS. FÁCIL."],
+				[0, "FECHOU VÁRIAS LINHAS SEGUIDAS? COMBO! PONTOS EXTRAS PRA VOCÊ."],
+				[1, "VÃO APARECER LETRAS VOANDO POR AÍ. JUNTE TODAS E GANHE UM PODER QUE PODE TE AJUDAR NESSA GRADE DOIDA."],
+				[0, "A BARRA AZUL AO LADO ENCHE CONFORME VOCÊ JOGA. FIQUE ATENTO COM ISSO, VOU DEIXAR VOCÊ DESCOBRIR O QUE ELA FAZ."],
+				[3, "E QUANDO A ARENA ENCHER ATÉ O TOPO... BEM, AÍ NEM EU TE SALVO."],
+				[4, "AGORA VAI LÁ E MOSTRA POR QUE VOCÊ FOI O CAMPEÃO ESCOLHIDO. MOSTRA PRA ELES QUE {UM} {N} É MAIS FORTE DO QUE ELES IMAGINAM."],
+				[4, "BOA SORTE, E MUUUITO CUIDADO! ADEUS, AMIGO."],
+			],
+			acao : "", meta : "", obj : "", lembrete : "", elogio : undefined,
+		},
+	];
+}
+
+//==================== INICIO (CHAMADO NO CREATE DO OBJ_GAME_CONTROL) ====================
+function tutorial_iniciar()
+{
+	global.tutorial = TUTORIAL_ATIVO and modo_arcade() and !modo_versus() and !global.coop and !MOBILE and !TESTE_AUTO and !global.teste_dif and (!global.tutorial_feito or global.tutorial_forcar);
+	global.tutorial_forcar = false;
+	global.tut_linha = false;
+	global.tut_quebrou = false;
+	global.tut_trava = false;
+	global.tut_sem_fraco = false;
+	global.tut_sem_forte = false;
+	global.tut_sem_giro = false;
+	tut = undefined;
+	if(!global.tutorial) exit;
+
+	//NADA NASCE SOZINHO: ONDAS, LASER, PEÇAS DUPLAS E LETRAS FICAM ESPERANDO (O OBJ_AREA TAMBEM NAO CRIA PEÇA: ALARM 0)
+	onda_proxima = 999999999;
+	laser_proxima = 999999999;
+	dupla_proxima = 999999999;
+	letra_timer = 999999999;
+	global.tut_trava = true;
+
+	tut = {
+		passos : tutorial_passos(),
+		p : 0,				//ETAPA ATUAL
+		f : 0,				//FALA ATUAL DENTRO DA ETAPA
+		fase : "intro",		//"intro" (O MACACO CAI), "entrada" (ESPERA UM POUCO), "falar", "meta", "elogio", "extra" (FALA SOLTA, EX: ERROU)
+		sub : 0,			//INTRO: 0 CAINDO, 1 ESMAGADO, 2 PULINHO
+		t : 0,				//FRAMES NA FASE
+		txt : "",			//TEXTO DA FALA JA QUEBRADO EM LINHAS
+		cara : 0,			//EXPRESSAO DA VACA
+		chars : 0,			//LETRAS JA ESCRITAS (MAQUINA DE ESCREVER)
+		alpha : 0,			//TRANSPARENCIA DA CAIXA (APARECE SUAVE)
+		pular : 0,			//FRAMES SEGURANDO TAB
+		x_min : 0, x_max : 0,	//META "mover": O QUANTO ELE JA ANDOU
+		chao : [],			//BLOCOS DO CHAO MONTADO NA ETAPA DA LINHA (PRA DIFERENCIAR DO BLOCO QUE CAI)
+		alvo : noone,		//BLOCO DA ETAPA (EMPURRAR)
+		alvo_x : 0,			//ONDE ELE ESTAVA
+		parado_t : 0,		//FRAMES COM O BLOCO DA LINHA PARADO E A LINHA NAO FECHOU (ERROU)
+		x_ini : 0,			//META "mover": ONDE ELE ESTAVA QUANDO COMEÇOU
+		tec_esq : false,	//META "mover": JA APERTOU PRA ESQUERDA
+		tec_dir : false,	//META "mover": JA APERTOU PRA DIREITA
+		acao_feita : false,	//ETAPA LIVRE: A ACAO (BLOCO NA ARENA) JA NASCEU?
+		lemb_t : 0,			//ETAPA LIVRE: FRAMES COM A ULTIMA FALA TODA ESCRITA (DEPOIS DISSO VIRA O LEMBRETE CURTO)
+	};
+	//CAMPOS OPCIONAIS DE CADA ETAPA (QUEM NAO TEM, GANHA O PADRAO)
+	for(var i = 0; i < array_length(tut.passos); i++)
+	{
+		var _ps = tut.passos[i];
+		if(!variable_struct_exists(_ps, "livre"))	_ps.livre = false;	//TRUE: SEM ENTER, O JOGADOR JA FAZ A TAREFA ENQUANTO A ULTIMA FALA APARECE
+		if(!variable_struct_exists(_ps, "acao_em"))	_ps.acao_em = -1;	//(LIVRE) EM QUAL FALA A ACAO NASCE (-1 = NA ULTIMA)
+		if(!variable_struct_exists(_ps, "bloq"))	_ps.bloq = "";		//GOLPES TRAVADOS NA ETAPA: "fraco", "forte", "giro" (JUNTOS NO MESMO TEXTO)
+	}
+}
+
+//FALA NOVA NA CAIXA
+function tutorial_falar(_cara, _txt)
+{
+	tut.cara = _cara;
+	tut.txt = tutorial_quebrar(tutorial_teclas(_txt));
+	tut.chars = 0;
+}
+
+//TEXTO CORRENTE JA ESCRITO ATE O FIM?
+function tutorial_pronto()
+{
+	return tut.chars >= string_length(tut.txt);
+}
+
+//COMEÇA UMA ETAPA
+function tutorial_etapa_iniciar(_p)
+{
+	tut.p = _p;
+	tut.f = 0;
+	tut.t = 0;
+	tut.fase = "falar";
+	tut.acao_feita = false;
+	tut.lemb_t = 0;
+	var _bq = tut.passos[_p].bloq;
+	global.tut_sem_fraco = string_pos("fraco", _bq) > 0;
+	global.tut_sem_forte = string_pos("forte", _bq) > 0;
+	global.tut_sem_giro = string_pos("giro", _bq) > 0;
+	var _f = tut.passos[_p].falas[0];
+	tutorial_falar(_f[0], _f[1]);
+}
+
+//ONDE FICA A LINHA DE BAIXO E AS CASAS DA ARENA (EM COORDENADAS DA ROOM)
+function tutorial_chao_y()	{ return obj_area.y + obj_area.sprite_height - CEL / 2; }
+function tutorial_col_x(_c)	{ return obj_area.x + CEL / 2 + _c * CEL; }
+
+//EFEITO DE ALGO NASCENDO NA ARENA: POEIRA E UMA ONDINHA (_FORTE = PEÇA INTEIRA / ENTRADA GRANDE)
+function tutorial_efeito_nascer(_x, _y, _forte = false)
+{
+	poeira(_x, _y + 6, _forte ? 7 : 3);
+	onda_choque(_x, _y, _forte ? 64 : 36, _forte ? 4 : 3, _forte ? 26 : 18);
+	audio_play_sound(snd_hit2, 1, false, _forte ? .5 : .3, 0, _forte ? .9 : 1.3);
+}
+
+//BLOCO QUE ACABOU DE NASCER: INCHA UM POUCO E PISCA BRANCO (POP)
+function tutorial_pop(_bloco)
+{
+	with(_bloco) { esc = 1.5; alpha_fog = 1; }
+}
+
+//LEVA O PLAYER PRA OUTRO LUGAR COM EFEITO NA SAIDA E NA CHEGADA (E ELE ESTICA NA CHEGADA)
+function tutorial_player_ir(_nx, _ny)
+{
+	with(obj_player)
+	{
+		poeira(x, y + 6, 6);
+		onda_choque(x, y - 6, 40, 3, 18);
+		x = _nx;
+		y = _ny;
+		velh = 0;
+		velv = 0;
+		image_xscale = 1;
+		esc_x = .7;
+		esc_y = 1.4;
+		poeira(x, y + 6, 6);
+		onda_choque(x, y - 6, 48, 4, 20);
+	}
+	audio_play_sound(snd_boing, 1, false, .5, 0, 1.5);
+}
+
+//APAGA TODA PEÇA E INIMIGO DA ARENA (COMEÇO DE CADA ACAO). OS BLOCOS EXPLODEM E VOAM PRA FORA (OBJ_PECA_MORTE)
+function tutorial_limpar_arena()
+{
+	with(obj_cria_peca) instance_destroy();
+	with(obj_peca) { destruido_por = noone; efeito_morte = true; poeira(x, y, 2); instance_destroy(); }
+	with(obj_inimigo) instance_destroy();
+}
+
+//ACAO "empurrar": UM BLOCO SOZINHO NO CHAO, A FRENTE DO PLAYER, PRA ELE EMPURRAR COM O SOCO
+function tutorial_acao_empurrar()
+{
+	tutorial_limpar_arena();
+	tut.alvo = criar_bloco_solto(tutorial_col_x(6), tutorial_chao_y(), cores.c_aqua);
+	tut.alvo_x = tut.alvo.x;
+	tutorial_efeito_nascer(tut.alvo.x, tut.alvo.y);
+	tutorial_pop(tut.alvo);
+}
+
+//ACAO "quebrar": UM BLOCO SOZINHO NO CHAO, UNS 3 BLOCOS A FRENTE DO PLAYER
+function tutorial_acao_quebrar()
+{
+	tutorial_limpar_arena();
+	global.tut_quebrou = false;
+	var _b = criar_bloco_solto(tutorial_col_x(6), tutorial_chao_y(), cores.c_yellow);
+	tutorial_efeito_nascer(_b.x, _b.y);
+	tutorial_pop(_b);
+}
+
+//ACAO "linha": A LINHA DE BAIXO FICA CHEIA MENOS UM BURACO (COLUNA 7) E UM BLOCO COMEÇA A CAIR NA COLUNA 5.
+//O PLAYER VAI PRA CIMA DA LINHA, DO LADO ESQUERDO, PRA CONSEGUIR SOCAR O BLOCO PRO LADO
+function tutorial_acao_linha()
+{
+	tutorial_limpar_arena();
+	global.tut_linha = false;
+	tut.chao = [];
+	tut.parado_t = 0;
+	for(var c = 0; c < obj_area.cols; c++)
+	{
+		if(c == 7) continue;
+		var _b = criar_bloco_solto(tutorial_col_x(c), tutorial_chao_y(), (c mod 2) == 0 ? cores.c_green : cores.c_aqua);
+		array_push(tut.chao, _b);
+		poeira(_b.x, _b.y + 6, 2);
+		tutorial_pop(_b);
+	}
+	//A CASA DO BURACO TAMBEM GANHA UMA ONDINHA (PRA CHAMAR ATENÇAO)
+	tutorial_efeito_nascer(tutorial_col_x(7), tutorial_chao_y(), true);
+	tutorial_player_ir(tutorial_col_x(3), obj_area.y + obj_area.sprite_height - CEL);
+	//O BLOCO QUE CAI (UM BLOCO SOZINHO, O MESMO CAMINHO DAS PEÇAS DE VERDADE: NA FILA DO TELEPORTE)
+	global.prox_tipo = tipo_peca.F;
+	global.prox_cor = cores.c_red;
+	global.prox_especie = "normal";
+	global.prox_fantasmas = 0;
+	global.prox_gelo = false;
+	instance_create_layer(tutorial_col_x(5), obj_area.y + CEL / 2 - CEL * 2, "Linha", obj_cria_peca);
+	tutorial_efeito_nascer(tutorial_col_x(5), obj_area.y + CEL, true);
+}
+
+//ACAO "peca": UMA PEÇA INTEIRA (4 BLOCOS NA HORIZONTAL) NO CHAO, E O PLAYER NA ESQUERDA, PRA EMPURRAR TUDO JUNTO COM O SOCO FORTE
+function tutorial_acao_peca()
+{
+	tutorial_limpar_arena();
+	tutorial_player_ir(tutorial_col_x(1), obj_area.y + obj_area.sprite_height - CEL);
+	var _pai = noone;
+	var _c = instance_create_layer(tutorial_col_x(5), tutorial_chao_y(), "Linha", obj_cria_peca);
+	with(_c)
+	{
+		alarm[0] = -1; //O ALARM DO CRIADOR SORTEARIA OUTRA PEÇA: AQUI A PEÇA E ESCOLHIDA
+		_pai = criar_pecas(tipo_peca.I2, cores.c_purple);
+	}
+	//NENHUM BLOCO DELA VIRA LASER/RAIVOSO/ESPECIAL
+	for(var i = 0; i < array_length(_pai.meus_filhos); i++) _pai.meus_filhos[i].alarm[1] = -1;
+	tut.alvo = _pai;
+	tut.alvo_x = _pai.x;
+	for(var i = 0; i < array_length(_pai.meus_filhos); i++) tutorial_pop(_pai.meus_filhos[i]);
+	tutorial_efeito_nascer(tutorial_col_x(5) + CEL / 2, tutorial_chao_y(), true);
+}
+
+//ACAO "giro_lat": UMA TORRE DE 3 BLOCOS DUAS CASAS A FRENTE DO PLAYER (QUE VAI PRA ESQUERDA DELA), PRA ELE PULAR E GIRAR PRO LADO COM SHIFT
+function tutorial_acao_giro_lat()
+{
+	tutorial_limpar_arena();
+	global.tut_quebrou = false;
+	global.habil.giro_lat = false;
+	tutorial_player_ir(tutorial_col_x(4), obj_area.y + obj_area.sprite_height - CEL);
+	for(var i = 0; i < 3; i++)
+	{
+		var _b = criar_bloco_solto(tutorial_col_x(6), tutorial_chao_y() - i * CEL, cores.c_yellow);
+		tutorial_pop(_b);
+		poeira(_b.x, _b.y + 6, 2);
+	}
+	tutorial_efeito_nascer(tutorial_col_x(6), tutorial_chao_y() - CEL, true);
+}
+
+//FAZ A ACAO DA ETAPA (O QUE NASCE NA ARENA)
+function tutorial_acao_rodar(_passo)
+{
+	switch(_passo.acao)
+	{
+		case "empurrar":	tutorial_acao_empurrar(); break;
+		case "peca":		tutorial_acao_peca(); break;
+		case "quebrar":		tutorial_acao_quebrar(); break;
+		case "giro_lat":	tutorial_acao_giro_lat(); break;
+		case "linha":		tutorial_acao_linha(); break;
+	}
+}
+
+//COMEÇA A META: ANOTA ONDE O PLAYER ESTAVA (META "mover")
+function tutorial_meta_iniciar()
+{
+	tut.x_ini = instance_exists(obj_player) ? obj_player.x : 0;
+	tut.x_min = tut.x_ini;
+	tut.x_max = tut.x_ini;
+	tut.tec_esq = false;
+	tut.tec_dir = false;
+}
+
+//O BLOCO/PEÇA DA META SUMIU (CAIU FORA, ETC): COLOCA OUTRO
+function tutorial_meta_reparar(_passo)
+{
+	if(tut.t < room_speed or instance_exists(tut.alvo)) return;
+	if(_passo.meta == "empurrar" or _passo.meta == "empurrar_peca") tutorial_acao_rodar(_passo);
+}
+
+//CUMPRIU A META: ELOGIO (SE TEM) OU PROXIMA ETAPA
+function tutorial_meta_cumprida(_passo)
+{
+	global.ensino_gaps = [];
+	if(!is_undefined(_passo.elogio))
+	{
+		tut.fase = "elogio";
+		tut.t = 0;
+		tutorial_falar(_passo.elogio[0], _passo.elogio[1]);
+		som_tocar(snd_certo);
+	}
+	else if(tut.p + 1 < array_length(tut.passos)) tutorial_etapa_iniciar(tut.p + 1);
+	else tutorial_concluir();
+}
+
+//A META DA ETAPA FOI CUMPRIDA?
+function tutorial_meta_ok(_meta)
+{
+	var _p = instance_exists(obj_player) ? obj_player : noone;
+	if(_p == noone) return false;
+	switch(_meta)
+	{
+		case "mover":
+			//TEM QUE APERTAR A TECLA DOS DOIS LADOS (UM TOQUINHO JA VALE) E SAIR UM POUCO DO LUGAR
+			tut.x_min = min(tut.x_min, _p.x);
+			tut.x_max = max(tut.x_max, _p.x);
+			if(keyboard_check(global.imputs.left)) tut.tec_esq = true;
+			if(keyboard_check(global.imputs.rigth)) tut.tec_dir = true;
+			return tut.tec_esq and tut.tec_dir and tut.x_max - tut.x_min >= 4;
+		case "pular":		return _p.estado == state.jump and _p.velv < -1.5;
+		case "empurrar":	return instance_exists(tut.alvo) and abs(tut.alvo.prox_x - tut.alvo_x) >= CEL * 2 - 2;
+		case "empurrar_peca":	return instance_exists(tut.alvo) and abs(tut.alvo.prox_x - tut.alvo_x) >= CEL * 2 - 2;
+		case "quebrar":		return global.tut_quebrou;
+		case "giro_lat":	return global.tut_quebrou and global.habil.giro_lat;	//GIRO LATERAL (SHIFT) QUE QUEBROU O BLOCO
+		case "linha":		return global.tut_linha;
+	}
+	return true;
+}
+
+//ACABOU O TUTORIAL (OU PULOU): GUARDA QUE JA VIU E COMEÇA A PARTIDA DE VERDADE (OS PONTOS DO TREINO NAO CONTAM)
+//(CHAMADO DE DENTRO DO OBJ_GAME_CONTROL, ONDE EXISTE O REINICIAR)
+function tutorial_concluir()
+{
+	global.tutorial_feito = true;
+	global.tutorial = false;
+	global.tut_trava = false;
+	global.tut_sem_fraco = false;
+	global.tut_sem_forte = false;
+	global.tut_sem_giro = false;
+	global.pontos_1 = 0;
+	reiniciar();
+}
+
+//==================== A CENA DO MACACO CAINDO ====================
+//0) O MACACO CAI DO CEU. 1) BATE NO CHAO E FICA ESMAGADINHO UM TEMPO. 2) DA UM PULINHO E O TUTORIAL COMEÇA
+function tutorial_intro()
+{
+	var _p = instance_exists(obj_player) ? obj_player : noone;
+	if(_p == noone) exit;
+	global.tut_trava = true;
+	switch(tut.sub)
+	{
+		//CAINDO: NO PRIMEIRO FRAME SOBE O MACACO PRA FORA DA TELA, SEM BLOCO NENHUM NA ARENA
+		case 0:
+			if(tut.t == 1)
+			{
+				tutorial_limpar_arena();
+				with(obj_player)
+				{
+					x = tutorial_col_x(4);
+					y = -40;
+					velh = 0;
+					velv = 0;
+					estado = state.jump;
+					image_xscale = 1;
+				}
+			}
+			//BATEU NO CHAO
+			if(tut.t > 10 and _p.solido(_p.x, _p.y + 1))
+			{
+				tut.sub = 1;
+				tut.t = 0;
+				with(_p) { velh = 0; velv = 0; }
+				poeira(_p.x, _p.y, 10);
+				onda_choque(_p.x, _p.y - 8, 60, 5, 24);
+				shakes(10, 3);
+				audio_play_sound(snd_hit2, 1, false, 1, 0, .6);
+				audio_play_sound(snd_player_morte, 1, false, .4, 0, 1.6);
+			}
+			break;
+
+		//ESMAGADINHO: FICA ACHATADO ALGUNS INSTANTES
+		case 1:
+			with(_p)
+			{
+				velh = 0;
+				esc_x = 1.8 * sign(image_xscale);
+				esc_y = .3;
+			}
+			if(tut.t > room_speed * 1.1)
+			{
+				tut.sub = 2;
+				tut.t = 0;
+				with(_p)
+				{
+					velv = -2.8;
+					estado = state.jump;
+					esc_x = .7 * sign(image_xscale);
+					esc_y = 1.4;
+				}
+				audio_play_sound(snd_boing, 1, false, .9, 0, 1.3);
+			}
+			break;
+
+		//PULINHO: QUANDO POUSA DE NOVO, A VACA APARECE E COMEÇA A AULA
+		case 2:
+			if(tut.t > 8 and _p.solido(_p.x, _p.y + 1) and _p.velv >= 0)
+			{
+				global.tut_trava = false;
+				tut.fase = "entrada";
+				tut.t = 0;
+			}
+			break;
+	}
+}
+
+//==================== STEP (CHAMADO NO OBJ_GAME_CONTROL, FORA DA PAUSA) ====================
+function tutorial_atualizar()
+{
+	if(!global.tutorial or is_undefined(tut) or !instance_exists(obj_area)) exit;
+	var _passo = tut.passos[tut.p];
+	var _enter = keyboard_check_pressed(vk_enter);
+	tut.t++;
+
+	//PULAR O TUTORIAL: SEGURA TAB
+	if(keyboard_check(vk_tab)) tut.pular++; else tut.pular = max(0, tut.pular - 2);
+	if(tut.pular >= TUT_PULAR_FRAMES) { tutorial_concluir(); exit; }
+
+	//A CAIXA APARECE SUAVE
+	tut.alpha = lerp(tut.alpha, (tut.fase == "entrada" or tut.fase == "intro") ? 0 : 1, .12);
+
+	//MAQUINA DE ESCREVER COM "VOZ" (UM BLIP A CADA 2 LETRAS)
+	if(tut.fase != "entrada" and tut.fase != "intro" and !tutorial_pronto())
+	{
+		var _antes = floor(tut.chars);
+		tut.chars += TUT_VEL_TEXTO;
+		var _depois = floor(tut.chars);
+		var _letra = string_char_at(tut.txt, max(1, _depois));
+		if(_depois > _antes and (_depois mod 2) == 0 and _letra != " " and _letra != "\n")
+		{
+			audio_play_sound(snd_menu_select_03, 1, false, .18, 0, .8 + (tut.cara == 1 ? .3 : 0) + random(.2));
+		}
+	}
+
+	switch(tut.fase)
+	{
+		//A CENA DO MACACO CAINDO
+		case "intro":
+			tutorial_intro();
+			break;
+
+		//UM TEMPINHO DEPOIS DA CENA, A VACA APARECE
+		case "entrada":
+			if(tut.t > room_speed * .8) tutorial_etapa_iniciar(0);
+			break;
+
+		//FALANDO: ENTER COMPLETA A FALA E, COM ELA COMPLETA, PASSA PRA PROXIMA
+		//ETAPA LIVRE: NA FALA DA ACAO O BLOCO NASCE E A META JA VALE (SEM ENTER). NA ULTIMA FALA O ENTER SO COMPLETA O TEXTO
+		case "falar":
+			var _ultima = tut.f >= array_length(_passo.falas) - 1;
+			if(_passo.livre)
+			{
+				var _em = _passo.acao_em < 0 ? array_length(_passo.falas) - 1 : _passo.acao_em;
+				if(tut.f >= _em)
+				{
+					if(!tut.acao_feita)
+					{
+						tut.acao_feita = true;
+						tutorial_acao_rodar(_passo);
+						tutorial_meta_iniciar();
+					}
+					tutorial_meta_reparar(_passo);
+					if(tutorial_meta_ok(_passo.meta)) { tutorial_meta_cumprida(_passo); break; }
+				}
+				//ULTIMA FALA TODA ESCRITA E ELE AINDA NAO FEZ: DEPOIS DE UM TEMPO TROCA POR UM LEMBRETE CURTO
+				if(_ultima and tutorial_pronto())
+				{
+					tut.lemb_t++;
+					if(tut.lemb_t > room_speed * 7)
+					{
+						tut.fase = "meta";
+						tut.t = 0;
+						tutorial_falar(0, _passo.lembrete);
+						tut.chars = string_length(tut.txt); //O LEMBRETE APARECE INTEIRO
+						break;
+					}
+				}
+			}
+			//ETAPA COM ENTER E ACAO ANTES DO FIM DAS FALAS (EX: A LINHA APARECE QUANDO ELA FALA "OLHA LA EMBAIXO")
+			if(!_passo.livre and _passo.acao_em >= 0 and tut.f >= _passo.acao_em and !tut.acao_feita)
+			{
+				tut.acao_feita = true;
+				tutorial_acao_rodar(_passo);
+			}
+			if(_passo.meta == "linha" and tut.acao_feita) global.ensino_gaps = [[tutorial_col_x(7), tutorial_chao_y()]];
+			if(_enter)
+			{
+				if(!tutorial_pronto()) tut.chars = string_length(tut.txt);
+				else if(!(_passo.livre and _ultima))
+				{
+					tut.f++;
+					if(tut.f < array_length(_passo.falas))
+					{
+						var _f = _passo.falas[tut.f];
+						tutorial_falar(_f[0], _f[1]);
+					}
+					else
+					{
+						//ACABARAM AS FALAS: FAZ A AÇAO (SE AINDA NAO FEZ) E VAI PRA META (OU PRA PROXIMA ETAPA SE NAO TEM)
+						if(!tut.acao_feita) tutorial_acao_rodar(_passo);
+						tut.acao_feita = true;
+						if(_passo.meta != "")
+						{
+							tut.fase = "meta";
+							tut.t = 0;
+							tutorial_meta_iniciar();
+							tutorial_falar(0, _passo.lembrete);
+							tut.chars = string_length(tut.txt); //O LEMBRETE APARECE INTEIRO
+						}
+						else if(tut.p + 1 < array_length(tut.passos)) tutorial_etapa_iniciar(tut.p + 1);
+						else tutorial_concluir();
+					}
+				}
+			}
+			break;
+
+		//ESPERANDO O JOGADOR FAZER: ELE ANDA LIVRE. CUMPRIU: ELOGIO
+		case "meta":
+			if(_passo.meta == "linha")
+			{
+				//A CASA QUE FALTA BRILHA (O OBJ_AREA DESENHA GLOBAL.ENSINO_GAPS)
+				global.ensino_gaps = [[tutorial_col_x(7), tutorial_chao_y()]];
+				tutorial_vigiar_linha();
+			}
+			else tutorial_meta_reparar(_passo);
+			if(tut.fase == "meta" and tutorial_meta_ok(_passo.meta)) tutorial_meta_cumprida(_passo);
+			break;
+
+		//ELOGIO: ENTER PASSA PRA PROXIMA ETAPA
+		case "elogio":
+			if(_enter)
+			{
+				if(!tutorial_pronto()) tut.chars = string_length(tut.txt);
+				else if(tut.p + 1 < array_length(tut.passos)) tutorial_etapa_iniciar(tut.p + 1);
+				else tutorial_concluir();
+			}
+			break;
+
+		//FALA SOLTA (EX: ERROU E ELA ARRUMA TUDO): ENTER FECHA E REFAZ A AÇAO DA ETAPA
+		case "extra":
+			if(_enter)
+			{
+				if(!tutorial_pronto()) tut.chars = string_length(tut.txt);
 				else
 				{
-					global.tempo_fase = "";
-					shakes(12, 3);
-					hitstop(6);
-					with(obj_area) alarm[0] = max(alarm[0], room_speed);
+					tutorial_acao_rodar(_passo);
+					tut.fase = "meta";
+					tut.t = 0;
+					tutorial_falar(0, _passo.lembrete);
+					tut.chars = string_length(tut.txt);
 				}
+			}
+			break;
+	}
+}
+
+//ETAPA DA LINHA: SE O BLOCO FICOU PARADO NO LUGAR ERRADO (OU SUMIU) SEM FECHAR A LINHA, A VACA ARRUMA TUDO E O JOGADOR TENTA DE NOVO
+function tutorial_vigiar_linha()
+{
+	if(global.tut_linha) exit;
+	var _bloco = noone;
+	with(obj_peca) if(!array_contains(other.tut.chao, id) and destruido_por == noone) _bloco = id;
+	var _errou = false;
+	if(tut.t > room_speed * 3)
+	{
+		if(_bloco == noone) _errou = true;
+		else if(_bloco.estou_parado and !_bloco.andar) { tut.parado_t++; if(tut.parado_t > room_speed * 6) _errou = true; }
+		else tut.parado_t = 0;
+	}
+	if(_errou)
+	{
+		global.ensino_gaps = [];
+		tut.fase = "extra";
+		tut.t = 0;
+		tutorial_falar(3, "UI! O BLOCO FOI PRO LUGAR ERRADO... DEIXA QUE A VOVÓ ARRUMA. DE NOVO, E COM CARINHO!");
+	}
+}
+
+//==================== O RETRATO DA VACA ====================
+//(_X, _Y) = CANTO DE CIMA ESQUERDO DA MOLDURA 52X60, EM PIXELS DA ROOM. _E = ESCALA DA GUI. _CARA: 0 NORMAL, 1 GRITANDO, 2 PISCANDO, 3 MACHUCADA, 4 ORGULHOSA.
+//SE EXISTIR A SPRITE SPR_VACA_PERFIL (60X60, UM FRAME POR CARA) ELA E USADA NO LUGAR DO DESENHO DE CODIGO
+function vaca_retrato(_x, _y, _e, _a, _cara)
+{
+	var _spr = asset_get_index("spr_vaca_perfil");
+	if(_spr != -1 and sprite_exists(_spr))
+	{
+		draw_sprite_part_ext(_spr, min(_cara, sprite_get_number(_spr) - 1), 4, 0, 52, 60, _x * _e, _y * _e, _e, _e, c_white, _a);
+		return;
+	}
+	draw_set_alpha(_a);
+	//FUNDO DO RETRATO
+	draw_set_color(#3B2A5A);
+	draw_rectangle(_x * _e, _y * _e, (_x + 51) * _e, (_y + 59) * _e, false);
+	//CHIFRES E ORELHAS
+	draw_set_color(#E8D9A0);
+	draw_triangle((_x + 12) * _e, (_y + 14) * _e, (_x + 8) * _e, (_y + 3) * _e, (_x + 19) * _e, (_y + 11) * _e, false);
+	draw_triangle((_x + 40) * _e, (_y + 14) * _e, (_x + 44) * _e, (_y + 3) * _e, (_x + 33) * _e, (_y + 11) * _e, false);
+	draw_set_color(#FFB6C1);
+	draw_ellipse((_x + 1) * _e, (_y + 17) * _e, (_x + 13) * _e, (_y + 27) * _e, false);
+	draw_ellipse((_x + 38) * _e, (_y + 17) * _e, (_x + 50) * _e, (_y + 27) * _e, false);
+	draw_set_color(#1A1A1A);
+	draw_ellipse((_x + 2) * _e, (_y + 18) * _e, (_x + 9) * _e, (_y + 25) * _e, false);
+	//CABEÇA BRANCA COM A MANCHA PRETA
+	draw_set_color(c_white);
+	draw_ellipse((_x + 8) * _e, (_y + 10) * _e, (_x + 43) * _e, (_y + 50) * _e, false);
+	draw_set_color(#1A1A1A);
+	draw_ellipse((_x + 29) * _e, (_y + 12) * _e, (_x + 41) * _e, (_y + 26) * _e, false);
+	//FOCINHO ROSA E NARINAS
+	draw_set_color(#FFB6C1);
+	draw_ellipse((_x + 13) * _e, (_y + 36) * _e, (_x + 38) * _e, (_y + 56) * _e, false);
+	draw_set_color(#C94F7C);
+	draw_ellipse((_x + 18) * _e, (_y + 42) * _e, (_x + 23) * _e, (_y + 48) * _e, false);
+	draw_ellipse((_x + 28) * _e, (_y + 42) * _e, (_x + 33) * _e, (_y + 48) * _e, false);
+	//OLHOS E BOCA DE CADA EXPRESSAO
+	draw_set_color(c_white);
+	var _o1x = _x + 19, _o2x = _x + 32, _oy = _y + 26;
+	if(_cara == 2)
+	{
+		draw_set_color(#1A1A1A);
+		draw_line_width((_o1x - 4) * _e, _oy * _e, (_o1x + 4) * _e, _oy * _e, _e);
+		draw_line_width((_o2x - 4) * _e, _oy * _e, (_o2x + 4) * _e, _oy * _e, _e);
+	}
+	else if(_cara == 3)
+	{
+		draw_set_color(#1A1A1A);
+		draw_line_width((_o1x - 3) * _e, (_oy - 3) * _e, (_o1x + 3) * _e, (_oy + 3) * _e, _e);
+		draw_line_width((_o1x - 3) * _e, (_oy + 3) * _e, (_o1x + 3) * _e, (_oy - 3) * _e, _e);
+		draw_line_width((_o2x - 3) * _e, (_oy - 3) * _e, (_o2x + 3) * _e, (_oy + 3) * _e, _e);
+		draw_line_width((_o2x - 3) * _e, (_oy + 3) * _e, (_o2x + 3) * _e, (_oy - 3) * _e, _e);
+	}
+	else if(_cara == 4)
+	{
+		//OLHOS FELIZES (ARCOS PRA CIMA)
+		draw_set_color(#1A1A1A);
+		draw_line_width((_o1x - 4) * _e, (_oy + 2) * _e, _o1x * _e, (_oy - 2) * _e, _e);
+		draw_line_width(_o1x * _e, (_oy - 2) * _e, (_o1x + 4) * _e, (_oy + 2) * _e, _e);
+		draw_line_width((_o2x - 4) * _e, (_oy + 2) * _e, _o2x * _e, (_oy - 2) * _e, _e);
+		draw_line_width(_o2x * _e, (_oy - 2) * _e, (_o2x + 4) * _e, (_oy + 2) * _e, _e);
+	}
+	else
+	{
+		draw_set_color(c_white);
+		draw_circle(_o1x * _e, _oy * _e, 4.5 * _e, false);
+		draw_circle(_o2x * _e, _oy * _e, 4.5 * _e, false);
+		draw_set_color(#1A1A1A);
+		draw_circle(_o1x * _e, _oy * _e, 4.5 * _e, true);
+		draw_circle(_o2x * _e, _oy * _e, 4.5 * _e, true);
+		draw_circle((_o1x + 1) * _e, (_oy + 1) * _e, 2 * _e, false);
+		draw_circle((_o2x + 1) * _e, (_oy + 1) * _e, 2 * _e, false);
+	}
+	//BOCA: ABERTA QUANDO GRITA, SORRISO QUANDO ORGULHOSA, RETINHA NAS OUTRAS
+	draw_set_color(#7A1F3D);
+	if(_cara == 1) draw_ellipse((_x + 20) * _e, (_y + 49) * _e, (_x + 31) * _e, (_y + 57) * _e, false);
+	else if(_cara == 4) { draw_line_width((_x + 19) * _e, (_y + 50) * _e, (_x + 25) * _e, (_y + 54) * _e, _e); draw_line_width((_x + 25) * _e, (_y + 54) * _e, (_x + 32) * _e, (_y + 50) * _e, _e); }
+	else draw_line_width((_x + 20) * _e, (_y + 52) * _e, (_x + 31) * _e, (_y + 52) * _e, _e);
+	draw_set_alpha(1);
+	draw_set_color(c_white);
+}
+
+//==================== DESENHO (GUI, CHAMADO NO DRAW_64 DO OBJ_GAME_CONTROL) ====================
+function tutorial_desenhar()
+{
+	if(!global.tutorial or is_undefined(tut) or tut.alpha < .02) exit;
+	var _e = gui_esc();
+	var _a = tut.alpha;
+	//CAIXA NO LADO ESQUERDO DA ARENA (EM PIXELS DA ROOM)
+	var _x1 = 12, _x2 = 262, _y1 = 96, _y2 = 252;
+	var _passo = tut.passos[tut.p];
+	//A FAIXA DO OBJETIVO APARECE NA META E TAMBEM NA ULTIMA FALA DE UMA ETAPA LIVRE (O JOGADOR JA PODE FAZER)
+	var _meta = tut.fase == "meta" or (tut.fase == "falar" and _passo.livre and tut.acao_feita and tut.f >= array_length(_passo.falas) - 1);
+	var _roxo1 = #5A3A8A, _roxo2 = #7A52B8, _roxo3 = #A98BE0;
+
+	//SOMBRA E CAIXA (BORDA CLARA, MIOLO ESCURO)
+	draw_set_color(c_black);
+	draw_set_alpha(_a * .45);
+	draw_rectangle((_x1 + 3) * _e, (_y1 + 3) * _e, (_x2 + 3) * _e, (_y2 + 3) * _e, false);
+	draw_set_alpha(_a);
+	draw_set_color(_roxo3);
+	draw_rectangle(_x1 * _e, _y1 * _e, _x2 * _e, _y2 * _e, false);
+	draw_set_color(#1B1038);
+	draw_rectangle((_x1 + 2) * _e, (_y1 + 2) * _e, (_x2 - 2) * _e, (_y2 - 2) * _e, false);
+
+	//FAIXA DO NOME (3 TONS)
+	draw_set_color(_roxo1);
+	draw_rectangle((_x1 + 2) * _e, (_y1 + 2) * _e, (_x1 + 152) * _e, (_y1 + 14) * _e, false);
+	draw_set_color(_roxo2);
+	draw_rectangle((_x1 + 152) * _e, (_y1 + 2) * _e, (_x1 + 200) * _e, (_y1 + 14) * _e, false);
+	draw_set_color(_roxo3);
+	draw_rectangle((_x1 + 200) * _e, (_y1 + 2) * _e, (_x2 - 2) * _e, (_y1 + 14) * _e, false);
+	draw_set_font(fnt_hud);
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_middle);
+	draw_text_transformed_color((_x1 + 7) * _e, (_y1 + 8.5) * _e, "DONA MALHADA", _e * .62, _e * .62, 0, c_white, c_white, c_white, c_white, _a);
+
+	//RETRATO DA VACA NUMA MOLDURA, BALANÇANDO DE LEVE ENQUANTO FALA
+	var _px = _x1 + 8, _py = _y1 + 20;
+	draw_set_color(#0E071B);
+	draw_rectangle((_px - 2) * _e, (_py - 2) * _e, (_px + 54) * _e, (_py + 62) * _e, false);
+	draw_set_color(_roxo2);
+	draw_rectangle((_px - 2) * _e, (_py - 2) * _e, (_px + 54) * _e, (_py + 62) * _e, true);
+	var _cara = tut.cara;
+	//PISCA DE VEZ EM QUANDO (SO QUANDO NAO TEM OUTRA CARA)
+	if(_cara == 0 and (current_time mod 3200) < 130) _cara = 2;
+	var _bal = tutorial_pronto() ? 0 : sin(current_time / 55) * 1;
+	vaca_retrato(_px, _py + _bal, _e, _a, _cara);
+
+	//TEXTO DA FALA (MAQUINA DE ESCREVER)
+	var _tx = _x1 + 68, _ty = _y1 + 20;
+	var _mostrar = string_copy(tut.txt, 1, floor(tut.chars));
+	draw_set_valign(fa_top);
+	draw_text_transformed_color((_tx + 1) * _e, (_ty + 1) * _e, _mostrar, _e * TUT_ESC, _e * TUT_ESC, 0, #0E071B, #0E071B, #0E071B, #0E071B, _a);
+	draw_text_transformed_color(_tx * _e, _ty * _e, _mostrar, _e * TUT_ESC, _e * TUT_ESC, 0, c_white, c_white, c_white, c_white, _a);
+
+	//OBJETIVO (FAIXA VERDE EMBAIXO) ENQUANTO ELE FAZ A META
+	if(_meta)
+	{
+		var _oy = _y2 - 38;
+		var _pulso = .75 + .25 * sin(current_time / 180);
+		draw_set_color(TEMPO_VERDE);
+		draw_set_alpha(_a * .18 * _pulso);
+		draw_rectangle((_x1 + 6) * _e, _oy * _e, (_x2 - 6) * _e, (_oy + 16) * _e, false);
+		draw_set_alpha(_a * _pulso);
+		draw_rectangle((_x1 + 6) * _e, _oy * _e, (_x2 - 6) * _e, (_oy + 16) * _e, true);
+		draw_set_alpha(_a);
+		draw_set_valign(fa_middle);
+		draw_text_transformed_color((_x1 + 12) * _e, (_oy + 8.5) * _e, "> " + _passo.obj, _e * .6, _e * .6, 0, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, _a);
+	}
+
+	//RODAPE: "ENTER" PISCANDO QUANDO A FALA TERMINOU, E O PULAR TUTORIAL (TAB) BEM FRACO COM UMA BARRINHA
+	draw_set_valign(fa_middle);
+	if(!_meta and tutorial_pronto() and ((current_time div 400) mod 2) == 0)
+	{
+		draw_text_transformed_color((_x2 - 52) * _e, (_y2 - 10) * _e, "ENTER", _e * .55, _e * .55, 0, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, _a);
+		draw_set_color(TEMPO_VERDE);
+		draw_triangle((_x2 - 14) * _e, (_y2 - 13) * _e, (_x2 - 6) * _e, (_y2 - 13) * _e, (_x2 - 10) * _e, (_y2 - 8) * _e, false);
+	}
+	draw_text_transformed_color((_x1 + 7) * _e, (_y2 - 10) * _e, "TAB: PULAR", _e * .5, _e * .5, 0, #8F86B8, #8F86B8, #8F86B8, #8F86B8, _a * .8);
+	if(tut.pular > 0)
+	{
+		draw_set_color(c_white);
+		draw_rectangle((_x1 + 7) * _e, (_y2 - 5) * _e, (_x1 + 7 + 60 * (tut.pular / TUT_PULAR_FRAMES)) * _e, (_y2 - 4) * _e, false);
+	}
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	draw_set_alpha(1);
+	draw_set_color(c_white);
+}
+
+//==================== ZORG, O ALIEN QUE CONTROLA A GRADE ====================
+//NOS MOMENTOS MAIORES (LASER, MINI GAME, PEÇAS MAIS RAPIDAS, CHUVA DE PEÇAS, PERIGO, MORTE, E QUANDO O JOGADOR VAI BEM) UM PAINEL COM O ROSTO DE UM ALIEN ENTRA
+//PELO LADO ESQUERDO DA TELA E SOLTA UMA FRASE MALVADA, COMO NOS JOGOS ANTIGOS. SO ISSO: NAO PAUSA, NAO PEDE ENTER, NAO APARECE NO TUTORIAL.
+//TODAS AS FRASES FICAM EM ZORG_FRASES (MUDAR TEXTO OU CARA E SO MEXER LA). ZORG_FALAR("EVENTO") E CHAMADO NOS PONTOS DO JOGO.
+//PRA TIRAR O ZORG SEM APAGAR CODIGO: ZORG_ATIVO = FALSE.
+//A ARTE AINDA NAO EXISTE: ZORG_CARA DESENHA UMA CARINHA POR CODIGO. QUANDO A SPRITE "SPR_ALIEN_CARA" EXISTIR NO PROJETO
+//(UM FRAME POR EXPRESSAO: 0 SORRISO MALVADO, 1 RINDO, 2 IRRITADO) ELA ENTRA SOZINHA NO LUGAR DO DESENHO.
+#macro ZORG_ATIVO		true
+#macro ZORG_ESPERA		(room_speed * 20)	//TEMPO MINIMO ENTRE UMA FALA E OUTRA (PRA NAO FICAR REPETITIVO)
+#macro ZORG_FONTE_TAM	16					//TAMANHO DA FONTE IMPACT (A ESCALA DE CADA FRASE E ESCOLHIDA SOZINHA PRA CABER NA FAIXA)
+#macro ZORG_ANGULO		26					//INCLINAÇAO DA FAIXA AMARELA E DA FRASE (GRAUS, SOBE PRA DIREITA)
+#macro ZORG_FAIXA_COMP	260					//COMPRIMENTO DA FAIXA (COMEÇA UM POUCO FORA DA TELA)
+#macro ZORG_FAIXA_ESP	96					//ESPESSURA DA FAIXA
+#macro ZORG_FAIXA_RECUO	38					//ONDE A FRASE COMEÇA NA FAIXA (A PARTIR DO COMEÇO DELA)
+#macro ZORG_FAIXA_W		196					//LARGURA MAXIMA DA FRASE (PX)
+#macro ZORG_FAIXA_H		58					//ALTURA MAXIMA DA FRASE (PX)
+#macro ZORG_VEL_TEXTO	.7					//LETRAS POR FRAME NA MAQUINA DE ESCREVER
+#macro ZORG_INICIO_S	.4					//SEGUNDOS DE PARTIDA ATE ELE SE APRESENTAR (NO COMEÇO: A 1A PEÇA SO NASCE QUANDO ELE SOME)
+
+global.zorg = undefined;	//A FALA NA TELA AGORA (UNDEFINED = ESCONDIDO)
+global.zorg_cd = 0;			//FRAMES ATE ELE PODER FALAR DE NOVO
+global.zorg_inicio = false;	//JA SE APRESENTOU NESSA PARTIDA?
+global.zorg_ultima = "";	//ULTIMA FRASE (PRA NAO REPETIR NA SEQUENCIA)
+global.zorg_intro = false;	//ELE AINDA VAI SE APRESENTAR (OU ESTA SE APRESENTANDO): A 1A PEÇA FICA ESPERANDO (OBJ_AREA, ALARM 0)
+
+//COMEÇOU A PARTIDA (CHAMADO NO CREATE DO OBJ_GAME_CONTROL)
+function zorg_iniciar()
+{
+	global.zorg = undefined;
+	global.zorg_cd = 0;
+	global.zorg_inicio = false;
+	global.zorg_ultima = "";
+	//NO ARCADE NORMAL ELE ABRE A PARTIDA: A PRIMEIRA PEÇA SO NASCE DEPOIS DA FALA DELE (NO TUTORIAL NAO: A VACA QUE MANDA)
+	global.zorg_intro = ZORG_ATIVO and modo_arcade() and !modo_versus() and !global.tutorial;
+	//A ABERTURA: O PERSONAGEM CAI DE CIMA E O ZORG APARECE NO PULINHO (ZORG_QUEDA_ATUALIZAR)
+	global.zq = global.zorg_intro ? { sub : 0, t : 0 } : undefined;
+	if(!global.tutorial) global.tut_trava = false;
+}
+
+//A 1A PEÇA DEVE ESPERAR? (OBJ_AREA, ALARM 0). SO ENQUANTO ELE SE APRESENTA. TRAVA DE SEGURANÇA: DEPOIS DE 12S DE PARTIDA SOLTA SEMPRE
+function zorg_segurando()
+{
+	return global.zorg_intro and global.tempo_partida < 16;
+}
+
+//AS FRASES DE CADA EVENTO
+function zorg_frases(_ev)
+{
+	switch(_ev)
+	{
+		case "inicio":		return ["BEM-VINDO À MINHA JAULA, {N}.", "EU CONTROLO CADA BLOCO. VOCÊ NÃO VAI SUBIR."];
+		case "laser":		return ["SINTA O CALOR, {N}!", "MIRA {NO} {N}! FOGO!", "NÃO PISQUE. SERIA A SUA ÚLTIMA VEZ.", "ESSE EU MIREI DIREITINHO."];
+		case "minigame":	return ["QUE TAL UM JOGUINHO? PERDER DÓI.", "RESOLVA, SE FOR TÃO ESPERTO.", "{O} {N} PODE SAIR PARA BRINCAR?"];
+		case "rapido":		return ["ACELEREI A GRADE. DE NADA.", "MAIS RÁPIDO, {N}! O TEMPO É MEU ALIADO.", "SUAS PERNAS JÁ ESTÃO CANSADAS?"];
+		case "onda":		return ["CHUVA DE BLOCOS!", "UM POUCO DE DIVERSÃO."];
+		case "perigo":		return ["JÁ ESTÁ NO TOPO... É O FIM.", "DESISTA, {N}.", "VOCÊ NÃO VAI SUBIR."];
+		case "morte":		return ["EU DISSE QUE VOCÊ NÃO SUBIA.", "FIM DE JOGO, {N}. A JAULA VENCEU.", "TENTE DE NOVO. EU GOSTO DE VER VOCÊ CAIR."];
+		case "combo":		return ["IMPOSSÍVEL! COMO FEZ ISSO?!", "SORTE DE INICIANTE. SÓ ISSO."];
+		case "level":		return ["ISSO NÃO ERA PRA ACONTECER...", "VOCÊ AINDA VAI ENGASGAR, {N}."];
+		case "palavra":		return ["DEVOLVE ESSE PODER!", "ISSO ERA MEU! VOCÊ ME PAGA!"];
+		case "frio":		return ["SENTE O FRIO, {N}?", "A JAULA ESTÁ CONGELANDO. QUE PENA.", "TUDO VIRA GELO. ESCORREGA, {N}!"];
+	}
+	return [];
+}
+
+//A CARA DE CADA EVENTO: 0 SORRISO MALVADO, 1 RINDO, 2 IRRITADO (QUANDO O JOGADOR VAI BEM)
+function zorg_cara_do_evento(_ev)
+{
+	switch(_ev)
+	{
+		case "laser": case "minigame": case "rapido": case "onda": case "morte": case "frio":	return 1;
+		case "combo": case "level": case "palavra":					return 2;
+	}
+	return 0;
+}
+
+//QUEBRA O TEXTO EM LINHAS QUE CABEM NA CAIXA DELE
+function zorg_quebrar(_txt, _larg)
+{
+	var _palavras = string_split(_txt, " ");
+	var _linha = "", _res = "";
+	for(var i = 0; i < array_length(_palavras); i++)
+	{
+		var _t = _linha == "" ? _palavras[i] : _linha + " " + _palavras[i];
+		if(string_width(_t) > _larg and _linha != "")
+		{
+			_res += _linha + "\n";
+			_linha = _palavras[i];
+		}
+		else _linha = _t;
+	}
+	return _res + _linha;
+}
+
+//A FONTE DO ZORG: IMPACT (PESADA, DE CARTAZ). CARREGADA DO SISTEMA NA 1A VEZ (WINDOWS SEMPRE TEM). SE NAO DER, USA A FONTE DO HUD
+global.zorg_font = -1;
+function zorg_fonte()
+{
+	if(global.zorg_font == -1)
+	{
+		global.zorg_font = fnt_hud;
+		try
+		{
+			var _f = font_add("Impact", ZORG_FONTE_TAM, false, false, 32, 255);
+			if(_f != -1 and font_exists(_f)) global.zorg_font = _f;
+		}
+		catch(_erro) { }
+	}
+	return global.zorg_font;
+}
+
+//ESCOLHE O MAIOR TAMANHO EM QUE A FRASE CABE NA FAIXA AMARELA (QUEBRANDO EM LINHAS). DEVOLVE O TEXTO JA QUEBRADO E A ESCALA
+function zorg_ajustar(_frase)
+{
+	draw_set_font(zorg_fonte());
+	var _escalas = [1.7, 1.5, 1.35, 1.2, 1.05, .9, .8, .7, .6, .5];
+	var _txt = _frase, _esc = .5;
+	for(var i = 0; i < array_length(_escalas); i++)
+	{
+		var _s = _escalas[i];
+		var _q = zorg_quebrar(_frase, ZORG_FAIXA_W / _s);
+		_txt = _q;
+		_esc = _s;
+		if(string_height(_q) * _s <= ZORG_FAIXA_H and string_width(_q) * _s <= ZORG_FAIXA_W) break;
+	}
+	return { txt : _txt, esc : _esc };
+}
+
+//O ZORG APARECE E FALA (_FORCAR = IGNORA O TEMPO ENTRE FALAS E SUBSTITUI A QUE ESTA NA TELA, EX: A MORTE)
+function zorg_falar(_ev, _forcar = false)
+{
+	if(!ZORG_ATIVO or !modo_arcade() or modo_versus() or global.tutorial) return;
+	if(!_forcar and (global.zorg_cd > 0 or !is_undefined(global.zorg))) return;
+	var _frases = zorg_frases(_ev);
+	if(array_length(_frases) == 0) return;
+	//SORTEIA UMA FRASE DIFERENTE DA ULTIMA
+	var _f = _frases[irandom(array_length(_frases) - 1)];
+	if(array_length(_frases) > 1) while(_f == global.zorg_ultima) _f = _frases[irandom(array_length(_frases) - 1)];
+	global.zorg_ultima = _f;
+	var _aj = zorg_ajustar(heroi_texto(_f));	//{N} VIRA O NOME DO PERSONAGEM ESCOLHIDO
+	var _txt = _aj.txt;
+	global.zorg = {
+		ev : _ev,
+		txt : _txt,
+		esc : _aj.esc,
+		chars : 0,
+		cara : zorg_cara_do_evento(_ev),
+		t : 0,
+		dur : max(room_speed * 3.6, string_length(_txt) / ZORG_VEL_TEXTO + room_speed * 2.8),
+	};
+	if(_ev == "morte") global.zorg.dur = room_speed * 6;
+	global.zorg_cd = ZORG_ESPERA;
+	//ENTRADA: UM GRAVE MALVADO E UMA TREMIDA DE LEVE
+	audio_play_sound(snd_hit2, 1, false, .45, 0, .45);
+	audio_play_sound(snd_menu_erro_03, 1, false, .25, 0, .55);
+}
+
+//TODO FRAME (OBJ_GAME_CONTROL, FORA DA PAUSA): CONTA O TEMPO, SE APRESENTA E ESCREVE A FALA
+function zorg_atualizar()
+{
+	if(!ZORG_ATIVO or !modo_arcade() or modo_versus()) exit;
+	if(global.zorg_cd > 0) global.zorg_cd--;
+	zorg_queda_atualizar();
+	//APRESENTACAO (UMA VEZ POR PARTIDA). NORMALMENTE VEM DA CENA DA QUEDA; ISSO AQUI E SO UM PLANO B
+	if(!global.zorg_inicio and !global.tutorial and is_undefined(global.zq) and global.tempo_partida >= ZORG_INICIO_S)
+	{
+		global.zorg_inicio = true;
+		zorg_falar("inicio", true);
+	}
+	var _z = global.zorg;
+	if(is_undefined(_z)) exit;
+	_z.t++;
+	//MAQUINA DE ESCREVER COM UM BIP MALIGNO (GRAVE, UM A CADA 2 LETRAS)
+	if(_z.chars < string_length(_z.txt))
+	{
+		var _antes = floor(_z.chars);
+		_z.chars += ZORG_VEL_TEXTO;
+		var _depois = floor(_z.chars);
+		var _letra = string_char_at(_z.txt, max(1, _depois));
+		if(_depois > _antes and (_depois mod 2) == 0 and _letra != " " and _letra != "\n")
+		{
+			audio_play_sound(snd_menu_select_03, 1, false, .2, 0, .3 + random(.15));
+		}
+	}
+	if(_z.t > _z.dur)
+	{
+		if(_z.ev == "inicio") global.zorg_intro = false; //SUMIU: A PRIMEIRA PEÇA PODE NASCER
+		global.zorg = undefined;
+	}
+}
+
+//A CARINHA (_X, _Y = CANTO DE CIMA ESQUERDO, 32X32 EM PIXELS DA ROOM). _E = ESCALA DA GUI
+function zorg_cara(_x, _y, _e, _a, _cara, _fundo = true)
+{
+	var _spr = asset_get_index("spr_alien_cara");
+	if(_spr != -1 and sprite_exists(_spr))
+	{
+		draw_sprite_stretched_ext(_spr, min(_cara, sprite_get_number(_spr) - 1), _x * _e, _y * _e, 32 * _e, 32 * _e, c_white, _a);
+		return;
+	}
+	draw_set_alpha(_a);
+	//FUNDO (SO NA CARINHA PEQUENA)
+	if(_fundo)
+	{
+		draw_set_color(#12081F);
+		draw_rectangle(_x * _e, _y * _e, (_x + 32) * _e, (_y + 32) * _e, false);
+	}
+	//ANTENAS COM PONTINHOS VERMELHOS (PISCAM)
+	var _pisca = (current_time mod 700) < 350;
+	draw_set_color(#3FAF3F);
+	draw_line_width((_x + 10) * _e, (_y + 7) * _e, (_x + 7) * _e, (_y + 2) * _e, _e);
+	draw_line_width((_x + 22) * _e, (_y + 7) * _e, (_x + 25) * _e, (_y + 2) * _e, _e);
+	draw_set_color(_pisca ? #FF2A55 : #8A1530);
+	draw_circle((_x + 7) * _e, (_y + 2) * _e, 1.6 * _e, false);
+	draw_circle((_x + 25) * _e, (_y + 2) * _e, 1.6 * _e, false);
+	//CABEÇA: VERDE, ESTREITA EMBAIXO (FORMATO DE ALIEN)
+	draw_set_color(#4FD84F);
+	draw_ellipse((_x + 5) * _e, (_y + 5) * _e, (_x + 27) * _e, (_y + 22) * _e, false);
+	draw_triangle((_x + 7) * _e, (_y + 17) * _e, (_x + 25) * _e, (_y + 17) * _e, (_x + 16) * _e, (_y + 31) * _e, false);
+	draw_set_color(#2E9A2E);
+	draw_ellipse((_x + 5) * _e, (_y + 5) * _e, (_x + 27) * _e, (_y + 22) * _e, true);
+	//OLHOS GRANDES INCLINADOS (PRETOS COM UM BRILHO VERMELHO)
+	draw_set_color(#0A0410);
+	draw_triangle((_x + 7) * _e, (_y + 11) * _e, (_x + 15) * _e, (_y + 17) * _e, (_x + 8) * _e, (_y + 19) * _e, false);
+	draw_triangle((_x + 25) * _e, (_y + 11) * _e, (_x + 17) * _e, (_y + 17) * _e, (_x + 24) * _e, (_y + 19) * _e, false);
+	draw_set_color(_cara == 2 ? #FF2A2A : #FF5577);
+	draw_circle((_x + 11) * _e, (_y + 16) * _e, (_cara == 2 ? 1.8 : 1.2) * _e, false);
+	draw_circle((_x + 21) * _e, (_y + 16) * _e, (_cara == 2 ? 1.8 : 1.2) * _e, false);
+	//IRRITADO: SOBRANCELHAS BRAVAS
+	if(_cara == 2)
+	{
+		draw_set_color(#0A0410);
+		draw_line_width((_x + 6) * _e, (_y + 9) * _e, (_x + 15) * _e, (_y + 13) * _e, 1.5 * _e);
+		draw_line_width((_x + 26) * _e, (_y + 9) * _e, (_x + 17) * _e, (_y + 13) * _e, 1.5 * _e);
+	}
+	//BOCA: SORRISO TORTO (0), RISADA ABERTA COM DENTES (1) OU TRAÇO BRAVO (2)
+	draw_set_color(#0A0410);
+	if(_cara == 1)
+	{
+		draw_ellipse((_x + 11) * _e, (_y + 22) * _e, (_x + 21) * _e, (_y + 27) * _e, false);
+		draw_set_color(c_white);
+		draw_line_width((_x + 12) * _e, (_y + 23) * _e, (_x + 20) * _e, (_y + 23) * _e, _e);
+	}
+	else if(_cara == 2)
+	{
+		draw_line_width((_x + 11) * _e, (_y + 25) * _e, (_x + 21) * _e, (_y + 24) * _e, _e);
+	}
+	else
+	{
+		draw_line_width((_x + 11) * _e, (_y + 24) * _e, (_x + 15) * _e, (_y + 26) * _e, _e);
+		draw_line_width((_x + 15) * _e, (_y + 26) * _e, (_x + 21) * _e, (_y + 22) * _e, _e);
+	}
+	draw_set_alpha(1);
+	draw_set_color(c_white);
+}
+
+//DESENHO (GUI, NO FIM DO DRAW_64 DO OBJ_GAME_CONTROL): UM PAINEL GRANDE ENTRA PELO LADO ESQUERDO (FAIXA VERMELHA DIAGONAL, FAIXA AMARELA INCLINADA,
+//ROSTO GRANDE EM CIMA, NOME EMBAIXO E A FRASE GIRADA ACOMPANHANDO A FAIXA), COM ALPHA BAIXO, E SAI DEVAGAR. ESTILO DE JOGO DE LUTA / VILAO DE FLIPERAMA.
+//TUDO EM PIXELS DA ROOM. NAO PASSA DE X = 225, ENTAO NUNCA COBRE A ARENA (QUE COMEÇA EM X = 280)
+#macro ZORG_ALPHA_FUNDO	.45		//TRANSPARENCIA DAS FAIXAS E DO OVAL (O TEXTO E O ROSTO FICAM MAIS FORTES)
+#macro ZORG_ALPHA_ROSTO	.85		//TRANSPARENCIA DO ROSTO
+#macro ZORG_ESCALA		.88		//TAMANHO DE TUDO (1 = TAMANHO ORIGINAL). O PAINEL FICA ENCOSTADO NO CANTO DE CIMA ESQUERDO
+#macro ZORG_NOME_ESC	1.05	//TAMANHO DO NOME "ZORG"
+
+//TEXTO COM CONTORNO ESCURO (LE EM CIMA DE QUALQUER FAIXA). _ANG EM GRAUS (SENTIDO ANTI-HORARIO)
+function zorg_texto(_x, _y, _txt, _esc, _ang, _cor, _a)
+{
+	var _e = gui_esc() * ZORG_ESCALA;
+	var _c = #3A0010;
+	var _d = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1]];
+	for(var i = 0; i < array_length(_d); i++)
+	{
+		draw_text_transformed_color(_x * _e + _d[i][0] * _e, _y * _e + _d[i][1] * _e, _txt, _e * _esc, _e * _esc, _ang, _c, _c, _c, _c, _a);
+	}
+	draw_text_transformed_color(_x * _e, _y * _e, _txt, _e * _esc, _e * _esc, _ang, _cor, _cor, _cor, _cor, _a);
+}
+
+function zorg_desenhar()
+{
+	var _z = global.zorg;
+	if(is_undefined(_z)) exit;
+	var _e0 = gui_esc();	//ESCALA CHEIA (SO PRA FAIXA VERMELHA, QUE VAI ATE O FIM DA TELA)
+	var _e = _e0 * ZORG_ESCALA;
+	//ENTRA E SAI EM 16 FRAMES (_K DE 0 A 1): DESLIZA PELO LADO E VAI APARECENDO / SUMINDO
+	var _k = min(clamp(_z.t / 16, 0, 1), clamp((_z.dur - _z.t) / 16, 0, 1));
+	var _ease = 1 - power(1 - _k, 3);
+	var _ox = -(1 - _ease) * 240 + (_z.t < 24 ? random_range(-1.5, 1.5) : 0);
+	var _pulso = .9 + .1 * sin(current_time / 130);
+
+	//FAIXA VERMELHA DIAGONAL (LARGA EM CIMA, ESTREITA EMBAIXO)
+	draw_set_color(#E5173A);
+	draw_set_alpha(ZORG_ALPHA_FUNDO * _k);
+	draw_triangle((0 + _ox) * _e, 0, (225 + _ox) * _e, 0, (112 + _ox) * _e, 405 * _e0, false);
+	draw_triangle((0 + _ox) * _e, 0, (112 + _ox) * _e, 405 * _e0, (0 + _ox) * _e, 405 * _e0, false);
+	//BORDA CLARA NA DIAGONAL
+	draw_set_color(#FF8CA0);
+	draw_set_alpha(ZORG_ALPHA_FUNDO * _k * 1.4);
+	draw_line_width((225 + _ox) * _e, 0, (112 + _ox) * _e, 405 * _e0, 2 * _e);
+
+	//OVAL VERDE ATRAS DO ROSTO
+	draw_set_color(#2FA36B);
+	draw_set_alpha(ZORG_ALPHA_FUNDO * _k * .9);
+	draw_ellipse((12 + _ox) * _e, 6 * _e, (136 + _ox) * _e, 190 * _e, false);
+
+	//FAIXA AMARELA INCLINADA (RETANGULO GIRADO ZORG_ANGULO GRAUS: COMEÇA FORA DA TELA E TERMINA CORTADO RETO). U = ONDE O TEXTO CORRE, V = PRA BAIXO DELA
+	var _th = degtorad(ZORG_ANGULO);
+	var _ux = cos(_th), _uy = -sin(_th);
+	var _vx = sin(_th), _vy = cos(_th);
+	var _sx = -20 + _ox, _sy = 300;
+	var _ex = _sx + _ux * ZORG_FAIXA_COMP, _ey = _sy + _uy * ZORG_FAIXA_COMP;
+	var _m = ZORG_FAIXA_ESP / 2;
+	var _ax = _sx - _vx * _m, _ay = _sy - _vy * _m;	//CANTO DE CIMA, COMEÇO
+	var _bx = _sx + _vx * _m, _by = _sy + _vy * _m;	//CANTO DE BAIXO, COMEÇO
+	var _cx = _ex + _vx * _m, _cy = _ey + _vy * _m;	//CANTO DE BAIXO, FIM
+	var _dx = _ex - _vx * _m, _dy = _ey - _vy * _m;	//CANTO DE CIMA, FIM
+	draw_set_color(#FFD21F);
+	draw_set_alpha(ZORG_ALPHA_FUNDO * _k * _pulso);
+	draw_triangle(_ax * _e, _ay * _e, _bx * _e, _by * _e, _cx * _e, _cy * _e, false);
+	draw_triangle(_ax * _e, _ay * _e, _cx * _e, _cy * _e, _dx * _e, _dy * _e, false);
+	draw_set_color(#FFF08A);
+	draw_set_alpha(ZORG_ALPHA_FUNDO * _k * 1.4);
+	draw_line_width(_ax * _e, _ay * _e, _dx * _e, _dy * _e, 1.5 * _e);
+	draw_line_width(_bx * _e, _by * _e, _cx * _e, _cy * _e, 1.5 * _e);
+	draw_set_alpha(1);
+
+	//ROSTO GRANDE (O MESMO DESENHO DA CARINHA, AUMENTADO 3.4X, SEM O FUNDO QUADRADO)
+	var _s = 3.4;
+	zorg_cara((19 + _ox) / _s, 44 / _s, _e * _s, ZORG_ALPHA_ROSTO * _k, _z.cara, false);
+
+	//NOME (EMBAIXO DO ROSTO)
+	draw_set_font(zorg_fonte());
+	draw_set_halign(fa_center);
+	draw_set_valign(fa_top);
+	zorg_texto(74 + _ox, 156, "ZORG", ZORG_NOME_ESC, 0, c_white, _k);
+	draw_set_halign(fa_left);
+
+	//FRASE (MAQUINA DE ESCREVER), GIRADA COMO A FAIXA E CENTRADA NA ESPESSURA DELA
+	var _mostrar = string_copy(_z.txt, 1, floor(_z.chars));
+	var _alt = string_height(_z.txt) * _z.esc;
+	var _px = _sx + _ux * ZORG_FAIXA_RECUO - _vx * (_alt / 2);
+	var _py = _sy + _uy * ZORG_FAIXA_RECUO - _vy * (_alt / 2);
+	zorg_texto(_px, _py, _mostrar, _z.esc, ZORG_ANGULO, c_white, _k);
+	draw_set_alpha(1);
+	draw_set_color(c_white);
+}
+
+
+//==================== A ABERTURA DA PARTIDA: O PERSONAGEM CAI E O ZORG APARECE NO PULINHO ====================
+//0) O PERSONAGEM CAI DO CEU. 1) BATE NO CHAO E FICA ESMAGADINHO UM INSTANTE. 2) DA UM PULINHO E NESSA HORA O ZORG APARECE E FALA.
+//QUANDO POUSA DE NOVO O CONTROLE VOLTA. A PRIMEIRA PEÇA SO NASCE DEPOIS QUE O ZORG SOME (ZORG_SEGURANDO). MESMA CENA DO TUTORIAL (TUTORIAL_INTRO)
+global.zq = undefined;	//ESTADO DA CENA: { SUB, T } (UNDEFINED = NAO ESTA ACONTECENDO)
+
+function zorg_queda_atualizar()
+{
+	var _q = global.zq;
+	if(is_undefined(_q)) exit;
+	var _p = player_n(1);
+	if(_p == noone) exit;
+	_q.t++;
+	global.tut_trava = true;
+	//TRAVA DE SEGURANÇA: SE ALGO DER ERRADO A CENA ACABA SOZINHA
+	if(_q.t > room_speed * 8)
+	{
+		global.tut_trava = false;
+		global.zq = undefined;
+		if(!global.zorg_inicio) { global.zorg_inicio = true; zorg_falar("inicio", true); }
+		exit;
+	}
+	switch(_q.sub)
+	{
+		//CAINDO: NO PRIMEIRO FRAME SOBE TODO MUNDO PRA FORA DA TELA
+		case 0:
+			if(_q.t == 1)
+			{
+				with(obj_player)
+				{
+					if(player_e_fantasma(id)) continue;
+					y = -40;
+					velh = 0;
+					velv = 0;
+					estado = state.jump;
+				}
+			}
+			//BATEU NO CHAO
+			if(_q.t > 10 and _p.solido(_p.x, _p.y + 1))
+			{
+				_q.sub = 1;
+				_q.t = 0;
+				with(obj_player)
+				{
+					velh = 0;
+					velv = 0;
+					poeira(x, y, 10);
+					onda_choque(x, y - 8, 60, 5, 24);
+				}
+				shakes(10, 3);
+				audio_play_sound(snd_hit2, 1, false, 1, 0, .6);
+				audio_play_sound(snd_player_morte, 1, false, .4, 0, 1.6);
+			}
+			break;
+
+		//ESMAGADINHO: FICA ACHATADO UM INSTANTE E DA O PULINHO (AI O ZORG APARECE)
+		case 1:
+			with(obj_player)
+			{
+				velh = 0;
+				esc_x = 1.8 * sign(image_xscale);
+				esc_y = .3;
+			}
+			if(_q.t > room_speed * .7)
+			{
+				_q.sub = 2;
+				_q.t = 0;
+				with(obj_player)
+				{
+					velv = -2.8;
+					estado = state.jump;
+					esc_x = .7 * sign(image_xscale);
+					esc_y = 1.4;
+				}
+				audio_play_sound(snd_boing, 1, false, .9, 0, 1.3);
+				global.zorg_inicio = true;
+				zorg_falar("inicio", true);
+			}
+			break;
+
+		//PULINHO: QUANDO POUSA DE NOVO O CONTROLE VOLTA (O ZORG CONTINUA FALANDO)
+		case 2:
+			if(_q.t > 8 and _p.solido(_p.x, _p.y + 1) and _p.velv >= 0)
+			{
+				global.tut_trava = false;
+				global.zq = undefined;
 			}
 			break;
 	}

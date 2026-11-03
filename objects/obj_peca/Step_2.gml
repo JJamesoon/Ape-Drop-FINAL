@@ -1,7 +1,7 @@
 //END STEP DA PEÇA: AQUI ELA SE MOVE DE VERDADE E PARA QUANDO BATE.
 //PAUSADO OU NO HITSTOP: NAO MEXE
 if(global.pause_timer) exit;
-if(global.game_pause) exit;
+if(pausa_em(x)) exit;
 
 //O QUE PARA UMA PEÇA
 var _obj = [obj_block, obj_peca, obj_mask_fa];

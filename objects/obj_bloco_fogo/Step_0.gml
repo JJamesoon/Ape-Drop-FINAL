@@ -1,5 +1,5 @@
 //PAUSADO: O BLOCO FICA PARADO
-if(global.game_pause) exit;
+if(pausa_em(x)) exit;
 timer_fase++;
 
 //SENDO ENGOLIDO (O DRAW FAZ O GIRO). ACABOU: VAI PRO TOPO DA ARENA, NA COLUNA DO PLAYER, E ABRE O PORTAL

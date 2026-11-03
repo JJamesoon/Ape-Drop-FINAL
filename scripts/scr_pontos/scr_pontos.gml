@@ -3,6 +3,8 @@
 //IRMANDADE:		PEÇA QUE AINDA TAVA INTEIRA NA LINHA E DESTRUIDA TODA. CADA BLOCO DELA VIRA UM QUADRADO
 //					VERMELHO COM "10" E ESSE 10 VOA PRO NUMERO DO CENTRO (1000 -> 1010 -> 1020...)
 
+//OS NUMEROS DE PONTOS (OS "10", O NUMERO DO CENTRO E OS TEXTOS VOANDO) FICAM POR CIMA DE TUDO NA ARENA, ATE DO LETREIRO "ANDAR 2!" (OBJ_LINHA, DEPTH -10000)
+#macro DEPTH_PONTOS			-11000
 #macro PONTOS_LINHA			1000	//CADA LINHA COMPLETA (VALOR FIXO)
 #macro PONTOS_IRMANDADE		10		//CADA BLOCO DE UMA PEÇA INTEIRA DESTRUIDA NA LINHA
 #macro PONTOS_UMA_COR		1000	//BONUS DA LINHA DE UMA COR SO
@@ -13,7 +15,7 @@
 #macro PONTOS_ESPECIAL		1000	//BLOCO ESPECIAL (ARCO-IRIS) QUANDO SORTEIA PONTOS
 
 //BLOCO DE PEDRA (SOLIDO): AGUENTA UM GOLPE DO PLAYER (RACHA) E QUEBRA NO SEGUNDO
-#macro PEDRA_CHANCE			4					//CHANCE (0-100) DE CADA BLOCO NOVO VIRAR PEDRA (SORTEIO PROPRIO)
+#macro PEDRA_CHANCE			6					//(+2) CHANCE (0-100) DE CADA BLOCO NOVO VIRAR PEDRA (SORTEIO PROPRIO)
 #macro PEDRA_IMUNE			15					//FRAMES DEPOIS DE RACHAR ATE PODER LEVAR O SEGUNDO GOLPE (O MESMO GIRO NAO TIRA AS DUAS)
 
 //O PLAYER BATEU NO BLOCO (GIRO, QUIQUE, CABEÇADA): QUEBRA. O BLOCO DE PEDRA SO RACHA NO PRIMEIRO GOLPE
@@ -21,6 +23,7 @@
 function bloco_golpe(_peca)
 {
 	if(!instance_exists(_peca)) return false;
+	global.tut_quebrou = true; //TUTORIAL: O JOGADOR QUEBROU (OU TENTOU QUEBRAR) UM BLOCO
 	if(_peca.sou_pedra)
 	{
 		if(_peca.pedra_imune > 0) return false;
@@ -37,19 +40,20 @@ function bloco_golpe(_peca)
 		}
 	}
 	_peca.destruido_por = "player";
+	if(room == rm_versus and variable_instance_exists(id, "jogador")) _peca.vs_dono = jogador; //VERSUS: OS PONTOS SAO DE QUEM QUEBROU (O FANTASMA DA PONTO PRO DONO DELE)
 	instance_destroy(_peca);
 	return true;
 }
 
 //BLOCO RAIO E MODO BONUS
-#macro RAIO_CHANCE			2.5					//CHANCE (0-100) DE CADA BLOCO NOVO VIRAR O BLOCO RAIO (SORTEIO PROPRIO)
+#macro RAIO_CHANCE			4.5					//(+2) CHANCE (0-100) DE CADA BLOCO NOVO VIRAR O BLOCO RAIO (SORTEIO PROPRIO)
 #macro RAIO_TEMPO			(room_speed * 8)	//QUANTO TEMPO TUDO FICA AQUA COM OS PONTOS DOBRADOS
 #macro RAIO_PONTOS			2					//MULTIPLICADOR DE PONTOS DO RAIO (SOMA COM A FEBRE: OS DOIS = X4)
 #macro BONUS_TEMPO			(room_speed * 10)	//QUANTO TEMPO DURA O MODO BONUS (TODO BLOCO SOLTA MOEDA)
 #macro BONUS_CHANCE			35					//CHANCE (0-100) DO BONUS ENTRAR NO SORTEIO DO BLOCO ESPECIAL (MAIS RARO QUE OS OUTROS PREMIOS)
 
 //BLOCO FUJAO (TEM MOEDA DENTRO E FOGE DO PLAYER)
-#macro FUJAO_CHANCE			3					//CHANCE (0-100) DE CADA BLOCO NOVO VIRAR FUJAO (SORTEIO PROPRIO)
+#macro FUJAO_CHANCE			5					//(+2) CHANCE (0-100) DE CADA BLOCO NOVO VIRAR FUJAO (SORTEIO PROPRIO)
 #macro FUJAO_PERTO			44					//PLAYER MAIS PERTO QUE ISSO (PX): ELE ACORDA E FOGE
 #macro FUJAO_LONGE			96					//PLAYER MAIS LONGE QUE ISSO: VOLTA A SER UM BLOCO NORMAL
 #macro FUJAO_PASSO			8					//FRAMES PARADO EM CADA CASA ANTES DE IR PRA PROXIMA
@@ -84,13 +88,13 @@ function bloco_liberado(_minutos)
 }
 
 //GELO: A PEÇA INTEIRA (OS 4 BLOCOS) VEM DE GELO. EM CIMA DELE O PLAYER ESCORREGA
-#macro GELO_CHANCE			(TESTE_BLOCOS ? 20 : 10)		//CHANCE (0-100) DA PROXIMA PEÇA VIR DE GELO (A PRIMEIRA E A DO TESTE_BLOCOS)
+#macro GELO_CHANCE			(TESTE_BLOCOS ? 20 : 12)		//(+2) CHANCE (0-100) DA PROXIMA PEÇA VIR DE GELO (A PRIMEIRA E A DO TESTE_BLOCOS)
 #macro GELO_ATRITO			.04		//EM CIMA DO GELO O PLAYER ACELERA E FREIA BEM DEVAGAR (NO CHAO NORMAL E DE .1 A .7)
 #macro GELO_PAREDE_VEL		2		//AGARRADO NUMA PAREDE DE GELO ELE ESCORREGA PRA BAIXO NESSA VELOCIDADE (NA PAREDE NORMAL .3)
 #macro GELO_PAREDE_PULO		1.5		//WALL JUMP NA PAREDE DE GELO: SO UM PULINHO PRO LADO (NAO DA PRA ESCALAR)
 
 //COLMEIA: PARADA, SOLTA UMA ABELHA DE TEMPOS EM TEMPOS (OBJ_ABELHA). A ABELHA VAI NO BLOCO MAIS PERTO E SE DESTROI COM ELE
-#macro COLMEIA_CHANCE		(TESTE_BLOCOS ? 5 : 2)		//CHANCE (0-100) DE CADA BLOCO NOVO VIRAR COLMEIA (NO MAXIMO UMA NA ARENA)
+#macro COLMEIA_CHANCE		(TESTE_BLOCOS ? 5 : 4)		//(+2) CHANCE (0-100) DE CADA BLOCO NOVO VIRAR COLMEIA (NO MAXIMO UMA NA ARENA)
 #macro COLMEIA_PRIMEIRA		(room_speed * 2)	//DEPOIS DE CAIR E ASSENTAR, TEMPO ATE AS PRIMEIRAS ABELHAS
 #macro COLMEIA_TEMPO		(room_speed * 3)	//DEPOIS, ABELHAS DE NOVO A CADA... (ERA 5S)
 #macro ABELHA_POR_VEZ		2		//ABELHAS QUE SAEM DE CADA VEZ
@@ -99,7 +103,7 @@ function bloco_liberado(_minutos)
 
 //LENTO: SE O PLAYER QUEBRAR ELE, NADA ACONTECE. SE ELE FOR DESTRUIDO DE OUTRO JEITO (LINHA, LASER, BOMBA...),
 //JOGA UM FEITIÇO NO PLAYER E TODOS OS MOVIMENTOS DELE FICAM LENTOS (O JOGADOR TEM QUE QUEBRAR ELE ANTES)
-#macro LENTO_CHANCE			(TESTE_BLOCOS ? 5 : 2.5)	//CHANCE (0-100) DE CADA BLOCO NOVO VIRAR LENTO (NO MAXIMO UM NA ARENA)
+#macro LENTO_CHANCE			(TESTE_BLOCOS ? 5 : 4.5)	//(+2) CHANCE (0-100) DE CADA BLOCO NOVO VIRAR LENTO (NO MAXIMO UM NA ARENA)
 #macro LENTO_TEMPO			(room_speed * 5)	//QUANTO TEMPO O PLAYER FICA LENTO
 #macro LENTO_MULT			.55		//O PLAYER SE MOVE NESSA FRAÇAO DA VELOCIDADE (O PULO CONTINUA DA MESMA ALTURA, SO MAIS DEVAGAR)
 #macro RAPIDO_TEMPO			(room_speed * 5)	//O PLAYER QUEBROU O BLOCO LENTO: FICA RAPIDO POR ESSE TEMPO
@@ -107,7 +111,7 @@ function bloco_liberado(_minutos)
 
 //GELATINA: BLOCO SOZINHO. PRO PLAYER E UM TRAMPOLIM (PISOU, E JOGADO PRA CIMA) E, SE ELE ENCOSTAR NA LATERAL, E JOGADO
 //UM POUCO PRO LADO. O BLOCO QUE CAI EM CIMA DELA SAI DA PEÇA E FICA QUICANDO ATE TER OUTRO BLOCO EM CIMA DELE
-#macro GELATINA_CHANCE		(TESTE_BLOCOS ? 12 : 5)		//CHANCE (0-100) DA PROXIMA PEÇA SER UM BLOCO DE GELATINA
+#macro GELATINA_CHANCE		(TESTE_BLOCOS ? 12 : 7)		//(+2) CHANCE (0-100) DA PROXIMA PEÇA SER UM BLOCO DE GELATINA
 #macro GELATINA_MAX			2		//GELATINAS NA ARENA AO MESMO TEMPO
 #macro GEL_IMPULSO			2.4		//VELOCIDADE PRA CIMA DO BLOCO QUICANDO (SOBE UM POUCO MAIS QUE 1 BLOCO. ERA 3.1, 2 BLOCOS)
 #macro GEL_GRAVIDADE		.15		//GRAVIDADE DO BLOCO QUICANDO (ELE SOBE E CAI COMO UMA BOLA, SEM PARAR NAS CASAS)
@@ -118,7 +122,7 @@ function bloco_liberado(_minutos)
 
 //BURACO: BLOCO SOZINHO. O BLOCO QUE CAI EM CIMA DELE E ENGOLIDO (SAI DA PEÇA) E VOLTA PELO TOPO DA ARENA, EM CIMA
 //DO PLAYER, PEGANDO FOGO (OBJ_BLOCO_FOGO): CAI DIRETO QUEBRANDO TUDO ATE O CHAO E DA DANO NO PLAYER
-#macro BURACO_CHANCE		(TESTE_BLOCOS ? 10 : 4)		//CHANCE (0-100) DA PROXIMA PEÇA SER UM BURACO
+#macro BURACO_CHANCE		(TESTE_BLOCOS ? 10 : 6)		//(+2) CHANCE (0-100) DA PROXIMA PEÇA SER UM BURACO
 #macro BURACO_MAX			1		//BURACOS NA ARENA AO MESMO TEMPO
 #macro BURACO_ESPERA		(room_speed * 3)	//DEPOIS DE ENGOLIR, O BURACO RECARREGA ESSE TEMPO ATE PODER ENGOLIR O PROXIMO
 #macro FOGO_ENGOLIR			(room_speed * .4)	//TEMPO DO BLOCO SENDO ENGOLIDO (GIRA E ENCOLHE PRA DENTRO DO REDEMOINHO)
@@ -201,15 +205,22 @@ function pontos_mult_andar()
 //SOMA OS PONTOS NO JOGADOR CERTO E MOSTRA O NUMERO AMARELO VOANDO ATE O SCORE DO HUD
 //O PONTO REAL E SOMADO NA HORA (NAO SE PERDE SE A PARTIDA ACABAR NO MEIO DO VOO),
 //MAS O NUMERO DO HUD SO SOBE QUANDO O TEXTO CHEGA LA (GLOBAL.PONTOS_PENDENTES)
-function pontos_somar(_pontos, _x, _y, _cor = c_yellow, _esc = 1)
+//_DONO (SO NO VERSUS): QUEM GANHA OS PONTOS (1 OU 2). SEM ELE, SAO DO DONO DA ARENA ONDE ESTA O X (OU DE QUEM TEM O FANTASMA LA DENTRO)
+function pontos_somar(_pontos, _x, _y, _cor = c_yellow, _esc = 1, _dono = -1)
 {
 	//NA FEBRE OS PONTOS DOBRAM
 	_pontos = round(_pontos * febre_mult());
 	if(_pontos <= 0) exit;
 	
 	//CADA MODO GUARDA OS PONTOS NUM LUGAR
-	if(room == rm_versus and _x > room_width/2)		global.pontos_2		+= _pontos;
-	else												global.pontos_1		+= _pontos;
+	var _jog = 1;
+	if(room == rm_versus)
+	{
+		var _zz = versus_zona_x(_x);
+		_jog = _dono > 0 ? _dono : (_zz >= 0 ? versus_pontos_de(_zz) : 1);
+	}
+	if(_jog == 2)	global.pontos_2		+= _pontos;
+	else			global.pontos_1		+= _pontos;
 	
 	//NO ARCADE O NUMERO VOA ATE O SCORE DO HUD
 	var _e = efeito_texto("+" + string(_pontos), _x, _y, c_yellow, _esc);
@@ -258,7 +269,7 @@ function coletor_obter()
 	}
 	
 	//NUMERO NOVO NO CENTRO DA TELA
-	var _c = instance_create_depth(room_width/2, room_height/2 - 40, -2100, obj_efeito_pontos);
+	var _c = instance_create_depth(room_width/2, room_height/2 - 40, DEPTH_PONTOS, obj_efeito_pontos);
 	_c.modo = "coletor";
 	_c.fase = "recebendo";
 	_c.evento = global.evento_linha;
@@ -319,7 +330,7 @@ function pontos_irmandade(_x, _y, _espera = 0, _c = noone, _reservado = false)
 	_c.real_pendente += _pontos;
 	if(!_reservado) _c.esperando++;
 	
-	var _e = instance_create_depth(_x, _y, -2000, obj_efeito_pontos);
+	var _e = instance_create_depth(_x, _y, DEPTH_PONTOS, obj_efeito_pontos);
 	_e.modo = "coletar";
 	_e.alvo = _c;
 	_e.valor = _pontos;
@@ -333,7 +344,7 @@ function pontos_irmandade(_x, _y, _espera = 0, _c = noone, _reservado = false)
 //TEXTO FLUTUANTE (PONTOS, LEVEL UP, EFEITOS DO BLOCO ESPECIAL...)
 function efeito_texto(_texto, _x, _y, _cor = c_white, _esc = 1)
 {
-	var _e = instance_create_depth(_x, _y, -2000, obj_efeito_pontos);
+	var _e = instance_create_depth(_x, _y, DEPTH_PONTOS, obj_efeito_pontos);
 	_e.mensagem = _texto;
 	_e.cor = _cor;
 	_e.esc_final = _esc;
@@ -410,23 +421,58 @@ function peca_velocidade_tempo()
 #macro DEPOIS_ANDAR2_ACELERA	.2		//DEPOIS DE COMPLETAR O 2O ANDAR: PEÇAS 20% MAIS RAPIDAS (QUEDA E NASCIMENTO)
 #macro TEMPO_ACELERA		.05		//CADA MINUTO DE PARTIDA: PEÇAS NASCEM 5% MAIS RAPIDO...
 #macro TEMPO_ACELERA_MAX	.25		//...ATE NO MAXIMO 25%
-#macro PERIGO_CHANCE_INICIO	5		//CHANCE DE LASER E DE RAIVOSO NO LEVEL 1 (ANTES ERA 10 E 8 FIXO)
-#macro PERIGO_CHANCE_LEVEL	2		//+ ISSO A CADA LEVEL...
-#macro PERIGO_CHANCE_MAX	15		//...ATE ESSE MAXIMO
-#macro FANTASMA_CHANCE		15		//CHANCE (0-100) DA PEÇA VIR COM BLOCOS FANTASMA (1, 2 GRUDADOS OU ELA INTEIRA)
-#macro INIMIGO_CHANCE_INICIO	4	//CHANCE DA PROXIMA PEÇA SER UM BLOCO INIMIGO NO COMEÇO...
-#macro INIMIGO_CHANCE_ANDAR2	8	//...DEPOIS DE COMPLETAR O 2O ANDAR...
-#macro INIMIGO_CHANCE_LEVEL		1	//...+ ISSO A CADA LEVEL...
-#macro INIMIGO_CHANCE_MAX		14	//...ATE ESSE MAXIMO
+//A DIFICULDADE POR LEVEL SOBE EM DEGRAUS: A CADA DIF_NIVEIS LEVEIS O JOGO FICA UM POUCO MAIS DIFICIL, ATE CHEGAR NO MAXIMO DE CADA ITEM
+//(DEGRAU 0 = LEVEIS 1 A 3, DEGRAU 1 = LEVEIS 4 A 6, ETC). AS PEÇAS PELO TEMPO DE PARTIDA E PELO 2O ANDAR CONTINUAM COMO ANTES
+#macro DIF_NIVEIS			3		//QUANTOS LEVEIS CADA DEGRAU DURA
+#macro DIF_QUEDA_DEGRAU		.09		//CADA DEGRAU: A PEÇA ESPERA ISSO (S) A MENOS PRA DESCER UMA CASA (COMEÇA EM .7, MINIMO .25)
+#macro DIF_CRIAR_DEGRAU		.22		//CADA DEGRAU: ISSO (S) A MENOS ENTRE UMA PEÇA E OUTRA (COMEÇA EM 2, MINIMO .9)
+#macro PERIGO_CHANCE_INICIO	1		//CHANCE DE LASER E DE RAIVOSO NO COMEÇO (ANTES ERA 10 E 8 FIXO; -4 PONTOS EM 2026-10-07)
+#macro PERIGO_CHANCE_LEVEL	3		//+ ISSO A CADA DEGRAU...
+#macro PERIGO_CHANCE_MAX	11		//...ATE ESSE MAXIMO (ERA 15)
+#macro FANTASMA_CHANCE		17		//(+2) CHANCE (0-100) DA PEÇA VIR COM BLOCOS FANTASMA (1, 2 GRUDADOS OU ELA INTEIRA)
+#macro INIMIGO_CHANCE_INICIO	1	//(ERA 4: -4 PONTOS, MINIMO 1) CHANCE DA PROXIMA PEÇA SER UM BLOCO INIMIGO NO COMEÇO...
+#macro INIMIGO_CHANCE_ANDAR2	4	//(ERA 8: -4 PONTOS) ...DEPOIS DE COMPLETAR O 2O ANDAR...
+#macro INIMIGO_CHANCE_LEVEL		2	//...+ ISSO A CADA DEGRAU...
+#macro INIMIGO_CHANCE_MAX		10	//(ERA 14: -4 PONTOS) ...ATE ESSE MAXIMO
 #macro INIMIGO_MAX				3	//NUNCA TEM MAIS QUE ISSO DE INIMIGOS NA ARENA
 #macro BOMBA_CHANCE				35	//CHANCE (0-100) DO INIMIGO SORTEADO SER UMA BOMBA
 #macro SNIPER_EXTRA				10	//O BLOCO SNIPER (SOU_SENSOR) TEM ESSA CHANCE A MAIS QUE O LASER/RAIVOSA
 #macro LASER_MAX					2	//BLOCOS LASER NA ARENA AO MESMO TEMPO (MAIS QUE ISSO FICA ROUBADO)
 
+//DEGRAU DE DIFICULDADE DE UM LEVEL (0 NOS LEVEIS 1-3, 1 NOS 4-6...)
+function dificuldade_degrau(_level)
+{
+	return max(0, (_level - 1) div DIF_NIVEIS);
+}
+
 //FATOR DO TEMPO DAS PEÇAS PELO 2O ANDAR (1 = NORMAL, MENOR = MAIS RAPIDO)
 function dificuldade_fator_andar()
 {
 	return global.passou_andar2 ? 1 - DEPOIS_ANDAR2_ACELERA : 1;
+}
+
+//COMEÇO DA PARTIDA MAIS LENTO: NO INICIO TUDO DEMORA INICIO_LENTO A MAIS (20%) E ISSO VAI SUMINDO ATE INICIO_LENTO_S (3 MIN),
+//QUANDO FICA NORMAL. DAI PRA FRENTE O JOGO SO ACELERA PELO LEVEL, ANDAR E TEMPO (OS OUTROS FATORES)
+#macro INICIO_LENTO		.2		//NO COMEÇO, AS PEÇAS DEMORAM 20% A MAIS (QUEDA E NASCIMENTO)
+#macro INICIO_LENTO_S	180		//SEGUNDOS ATE O JOGO FICAR NA VELOCIDADE NORMAL
+function dificuldade_fator_inicio()
+{
+	return 1 + INICIO_LENTO * clamp(1 - global.tempo_partida / INICIO_LENTO_S, 0, 1);
+}
+
+//AVISO DE QUE AS PEÇAS FICARAM MAIS RAPIDAS POR CAUSA DO TEMPO (A CADA MINUTO, ATE A ACELERAÇAO DO TEMPO PARAR). O LEVEL E O ANDAR 2
+//JA AVISAM COM A CONTAGEM "MAIS RAPIDO". TEXTO NA ARENA, SOM, TREMIDA E UMA VINHETA LARANJA NA BORDA DA TELA
+function velocidade_aviso()
+{
+	global.vel_aviso = 1;
+	zorg_falar("rapido");
+	som_tocar(snd_menu_erro_03);
+	shakes(4, 1);
+	if(instance_exists(obj_area))
+	{
+		efeito_texto(global.linguagem == 0 ? "PEÇAS MAIS RÁPIDAS!" : "FASTER PIECES!", obj_area.x + obj_area.sprite_width / 2, obj_area.y + 52, #FF9A3C, 1.3);
+		onda_choque(obj_area.x + obj_area.sprite_width / 2, obj_area.y + 60, 90, 4, 26);
+	}
 }
 
 //FATOR DO TEMPO DAS PEÇAS PELO TEMPO DE PARTIDA (PERDE 5% A CADA MINUTO, ATE 25%)
@@ -445,27 +491,29 @@ function chance_fantasma()
 function chance_inimigo()
 {
 	var _base = global.passou_andar2 ? INIMIGO_CHANCE_ANDAR2 : INIMIGO_CHANCE_INICIO;
-	return min(INIMIGO_CHANCE_MAX, _base + INIMIGO_CHANCE_LEVEL * (global.level - 1));
+	return min(INIMIGO_CHANCE_MAX, _base + INIMIGO_CHANCE_LEVEL * dificuldade_degrau(global.level));
 }
 
 //CHANCE (0-100) DE UM BLOCO VIRAR LASER OU DE UMA PEÇA VIRAR RAIVOSA (USADO NO ESCOLHENDO_TIPO_DO_BLOCO)
 function chance_perigo()
 {
-	return min(PERIGO_CHANCE_MAX, PERIGO_CHANCE_INICIO + PERIGO_CHANCE_LEVEL * (global.level - 1));
+	return min(PERIGO_CHANCE_MAX, PERIGO_CHANCE_INICIO + PERIGO_CHANCE_LEVEL * dificuldade_degrau(global.level));
 }
 
 //TEMPO QUE A PEÇA ESPERA ANTES DE DESCER UMA CASA (FICA MAIS RAPIDO A CADA LEVEL E DEPOIS DO 2O ANDAR)
 function peca_tempo_queda()
 {
-	var _base = max(.25, .7 - .06 * (global.nivel_vel - 1)); //NIVEL_VEL = LEVEL DEPOIS DA CONTAGEM DE 3S
-	return room_speed * max(.25, _base * dificuldade_fator_andar());
+	if(room == rm_versus) return versus_queda() * dificuldade_fator_inicio(); //VERSUS: COMEÇA CALMO E FICA FRENETICO
+	var _base = max(.25, .7 - DIF_QUEDA_DEGRAU * dificuldade_degrau(global.nivel_vel)); //NIVEL_VEL = LEVEL DEPOIS DA CONTAGEM DE 3S
+	return room_speed * max(.25, _base * dificuldade_fator_andar() * dificuldade_fator_inicio());
 }
 
 //TEMPO ENTRE UMA PEÇA NOVA E OUTRA (FICA MAIS RAPIDO A CADA LEVEL, DEPOIS DO 2O ANDAR E COM O TEMPO DE PARTIDA)
 function peca_tempo_criar()
 {
-	var _base = max(.9, 2 - .15 * (global.nivel_vel - 1));
-	return room_speed * max(.8, _base * dificuldade_fator_andar() * dificuldade_fator_tempo());
+	if(room == rm_versus) return versus_intervalo(); //(O VERSUS CRIA AS PEÇAS PELO VERSUS_ATUALIZAR)
+	var _base = max(.9, 2 - DIF_CRIAR_DEGRAU * dificuldade_degrau(global.nivel_vel));
+	return room_speed * max(.8, _base * dificuldade_fator_andar() * dificuldade_fator_tempo() * dificuldade_fator_inicio());
 }
 
 //ENERGIA E ESPECIAL==================================
@@ -536,7 +584,7 @@ function especial_usar(_bloco)
 {
 	if(!instance_exists(_bloco)) exit;
 	
-	if(global.energia < 1)
+	if(energia_valor(_bloco.x) < 1)
 	{
 		som_tocar(snd_menu_erro_01);
 		efeito_texto(texto("sem_energia"), x, y - 30, c_red, .9);
@@ -555,7 +603,7 @@ function especial_usar(_bloco)
 	}
 	
 	//GASTA A CARGA E FAZ O IMPACTO: ONDA DE CHOQUE, HITSTOP, SOM, TREMIDA E O NOME DO ESPECIAL
-	global.energia -= 1;
+	energia_gastar(_bloco.x, 1);
 	global.especial_cadeia = 0;
 	global.especial_restantes = array_length(_grupo);
 	emocao_mostrar(4, room_speed * 1.5); //RETRATO DO HUD FICA AZUL (PODER)
@@ -695,6 +743,7 @@ function onda_iniciar()
 	//TUDO SO CAI 2X MAIS RAPIDO DEPOIS DA CONTAGEM (AS PEÇAS DA ONDA TAMBEM SO COMEÇAM DEPOIS DELA)
 	contagem_iniciar(texto("onda"), function() { global.onda_timer = ONDA_RAPIDA; });
 	shakes(8, 2);
+	zorg_falar("onda");
 }
 
 //CONTAGEM DE 3S ANTES DE O JOGO FICAR MAIS RAPIDO (ONDA, FEBRE, 2O ANDAR, LEVEL)================

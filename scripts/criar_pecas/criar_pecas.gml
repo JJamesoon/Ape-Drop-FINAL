@@ -73,6 +73,9 @@ function peca_sortear_proxima()
 	else if(bloco_liberado(LIBERA_FANTASMA) and random(100) < chance_fantasma()) global.prox_fantasmas = choose(1, 1, 2, 2, 4);
 	//...OU A PEÇA INTEIRA DE GELO
 	else if(bloco_liberado(LIBERA_GELO) and random(100) < GELO_CHANCE) global.prox_gelo = true;
+
+	//FRIO (EFEITO DE AMBIENTE): TODA PEÇA NORMAL NASCE DE GELO ENQUANTO ELE DURA
+	if(global.frio > 0 and global.prox_especie == "normal") { global.prox_gelo = true; global.prox_fantasmas = 0; }
 }
 
 //POSIÇAO DOS 3 BLOCOS FILHOS EM RELAÇAO AO PAI (EM CELULAS)
@@ -104,7 +107,7 @@ function area_mais_perto(_x, _y)
 {
 	var _melhor = noone;
 	var _dist = infinity;
-	var _objs = [obj_area, obj_area_versus, obj_area_coop];
+	var _objs = [obj_area];
 	for(var i = 0; i < array_length(_objs); i++)
 	{
 		var _a = instance_nearest(_x, _y, _objs[i]);
@@ -371,7 +374,7 @@ function blocos_catalogo()
 		{ id : "colmeia",	min : LIBERA_COLMEIA,	nome : ["COLMEIA", "BEEHIVE"],		desc : ["SOLTA ABELHAS QUE DESTROEM O BLOCO MAIS PERTO. ELAS NÃO MACHUCAM E NÃO MORREM: QUEBRE A COLMEIA PRA PARAR.", "RELEASES BEES THAT DESTROY THE NEAREST BLOCK. THEY DON'T HURT AND CAN'T DIE: BREAK THE HIVE TO STOP THEM."] },
 		{ id : "laser",		min : LIBERA_LASER,		nome : ["LASER", "LASER"],			desc : ["CARREGA E ATIRA UM LASER NA DIREÇÃO DO PLAYER.", "CHARGES UP AND SHOOTS A LASER AT THE PLAYER."] },
 		{ id : "laser_lado",min : LIBERA_LASER,		nome : ["LASER LATERAL", "SIDE LASER"],	desc : ["ATIRA RETO PRO LADO MAIS ABERTO DA ARENA: QUEBRA O PRIMEIRO BLOCO QUE ACERTAR OU MACHUCA O PLAYER.", "SHOOTS STRAIGHT TOWARD THE OPEN SIDE OF THE ARENA: BREAKS THE FIRST BLOCK IT HITS OR HURTS THE PLAYER."] },
-		{ id : "sniper",	min : LIBERA_SNIPER,	nome : ["SNIPER", "SNIPER"],		desc : ["PARECE UM BLOCO NORMAL, MAS QUANDO O PLAYER PASSA NA LINHA DELE ELE SE LANÇA, QUEBRANDO TUDO NO CAMINHO.", "LOOKS LIKE A REGULAR BLOCK, BUT WHEN YOU CROSS ITS ROW IT LAUNCHES, BREAKING EVERYTHING IN ITS WAY."] },
+		{ id : "sniper",	min : LIBERA_SNIPER,	nome : ["SNIPER", "SNIPER"],		desc : ["O BLOCO DE OLHAR VERMELHO. QUANDO O PLAYER PASSA NA LINHA DELE, ELE ARMA O TIRO E SE LANÇA, QUEBRANDO TUDO NO CAMINHO.", "THE RED-EYED BLOCK. WHEN YOU CROSS ITS ROW IT ARMS ITS SHOT AND LAUNCHES, BREAKING EVERYTHING IN ITS WAY."] },
 		{ id : "bomba",		min : LIBERA_BOMBA,		nome : ["BOMBA", "BOMB"],			desc : ["INIMIGO QUE EXPLODE E MACHUCA QUEM ESTIVER PERTO.", "AN ENEMY THAT EXPLODES AND HURTS ANYONE NEARBY."] },
 		{ id : "fantasma",	min : LIBERA_FANTASMA,	nome : ["FANTASMA", "GHOST"],		desc : ["TRANSPARENTE: O PLAYER ATRAVESSA. SÓ O SOCO ESPIRITUAL ACERTA.", "TRANSPARENT: YOU PASS THROUGH IT. ONLY THE SPIRIT PUNCH HITS IT."] },
 		{ id : "inimigo",	min : LIBERA_INIMIGO,	nome : ["INIMIGO", "ENEMY"],		desc : ["ANDA PELA ARENA E MACHUCA SE ENCOSTAR. PULE EM CIMA OU GIRE PRA DERROTAR.", "WALKS AROUND AND HURTS ON TOUCH. STOMP IT OR SPIN TO DEFEAT IT."] },
@@ -412,7 +415,7 @@ function bloco_icone_desenhar(_id, _x, _y, _esc, _silhueta = false, _a = 1)
 		case "colmeia":		_spr = spr_bloco_colmeia; break;
 		case "laser":		_spr = spr_peca_laser; _img = 3; break;
 		case "laser_lado":	_spr = spr_peca_laser; _img = 3; break;
-		case "sniper":		_img = cores.c_red; break;
+		case "sniper":		_spr = spr_bloco_sniper_idle; _img = floor(current_time / 100) mod sprite_get_number(spr_bloco_sniper_idle); break;
 		case "bomba":		_spr = spr_inimigo_bomba; break;
 		case "fantasma":	_img = 6; _al = _a * .6; break;
 		case "inimigo":		_spr = spr_inimigo; break;
@@ -442,18 +445,10 @@ function bloco_icone_desenhar(_id, _x, _y, _esc, _silhueta = false, _a = 1)
 			draw_set_alpha(1);
 			draw_set_color(c_white);
 			break;
-		case "sniper":
-			draw_set_color(c_white);
-			draw_set_alpha(.8 * _a);
-			draw_circle(_x, _y, 4 * _esc, true);
-			draw_line(_x - 6 * _esc, _y, _x + 6 * _esc, _y);
-			draw_line(_x, _y - 6 * _esc, _x, _y + 6 * _esc);
-			draw_set_alpha(1);
-			break;
 	}
 }
 
-//O TIPO DE UM BLOCO DA ARENA (O ID DO CATALOGO). O SNIPER SO CONTA DEPOIS DE SE REVELAR
+//O TIPO DE UM BLOCO DA ARENA (O ID DO CATALOGO). O SNIPER TEM A CARA PROPRIA, ENTAO CONTA DESDE QUE APARECE
 function bloco_tipo_id(_b)
 {
 	with(_b)
@@ -470,7 +465,7 @@ function bloco_tipo_id(_b)
 		if(sou_lento) return "lento";
 		if(sou_gelatina) return "gelatina";
 		if(sou_buraco) return "buraco";
-		if(sou_sensor and sensor_timer >= 0) return "sniper";
+		if(sou_sensor) return "sniper";	//(ELE TEM A CARA PROPRIA O TEMPO TODO: CONTA COMO VISTO NA HORA)
 	}
 	return "normal";
 }
@@ -490,4 +485,209 @@ function blocos_procurar_novos()
 	with(obj_peca) if(destruido_por == noone and inicializando <= 0) bloco_descobrir(bloco_tipo_id(id));
 	with(obj_inimigo) if(vivo()) bloco_descobrir(bomba ? "bomba" : (cabecudo ? "cabecudo" : "inimigo"));
 	if(instance_exists(obj_sensor_voando)) bloco_descobrir("sniper");
+}
+
+
+//==================== ABERTURA DA PARTIDA: AS PRIMEIRAS PEÇAS SAO SEMPRE AS MESMAS ====================
+//NO ARCADE (1 JOGADOR, FORA DO TUTORIAL) AS 5 PRIMEIRAS PEÇAS NASCEM SEMPRE IGUAIS, NA COLUNA CERTA E JA NA POSIÇAO: E SO APERTAR
+//ESPAÇO (TELEPORTE) EM CADA UMA PRA ELAS FECHAREM A PRIMEIRA LINHA E O JOGADOR VER COMO FUNCIONA.
+//CADA ITEM: [TIPO, COR, COLUNA DO BLOCO PAI]. A ARENA TEM 10 COLUNAS (0 A 9): O(4-5) + J(2-3) + L(6-7) + O(0-1) + O(8-9) = 10 CASAS NA LINHA DE BAIXO
+global.abertura_i = 0;	//QUANTAS PEÇAS DA ABERTURA JA NASCERAM
+global.abertura_pecas = [
+	[tipo_peca.O,	cores.c_yellow,	4],
+	[tipo_peca.J1,	cores.c_aqua,	3],
+	[tipo_peca.J3,	cores.c_purple,	6],
+	[tipo_peca.O,	cores.c_red,	0],
+	[tipo_peca.O,	cores.c_green,	8],
+];
+global.abertura_marca = false;	//A PEÇA QUE ESTA NASCENDO E DA ABERTURA (NAO VIRA BLOCO ESPECIAL)
+
+//CHAMADO NO CREATE DO OBJ_GAME_CONTROL
+function abertura_iniciar()
+{
+	global.abertura_i = 0;
+	global.abertura_marca = false;
+}
+
+//A ABERTURA VALE NESSA PARTIDA? (SO NA ARENA DE 10 COLUNAS DO ARCADE SOLO)
+function abertura_ativa()
+{
+	return modo_arcade() and !modo_versus() and !global.coop and !global.tutorial and !global.teste_dif and !MOBILE and global.abertura_i < array_length(global.abertura_pecas) and global.debug_bloco == "" and instance_exists(obj_area) and obj_area.cols == 10;
+}
+
+
+//==================== EFEITO DE AMBIENTE: FRIO ====================
+//DE TEMPOS EM TEMPOS (SO NO ARCADE, DEPOIS DE FRIO_LIBERA MINUTOS) APARECE NO MEIO DA ARENA "ESTA FICANDO MUITO FRIO" COM A CONTAGEM DE 3S.
+//DEPOIS, POR FRIO_DURACAO, OS BLOCOS DA ARENA VAO VIRANDO GELO (O PLAYER ESCORREGA NELES) E TODA PEÇA NOVA JA NASCE DE GELO.
+//QUANDO O FRIO ACABA OS BLOCOS DE GELO "DERRETEM" AOS POUCOS E VOLTAM A COR DE ANTES. SO ENTRAM OS BLOCOS NORMAIS (OS ESPECIAIS NAO).
+//QUEM CONTROLA E O OBJ_GAME_CONTROL (FRIO_ATUALIZAR) E O VISUAL (VINHETA AZUL E NEVE) SAI NO DRAW_64 (FRIO_DESENHAR)
+#macro FRIO_LIBERA		3.5					//MINUTOS DE PARTIDA ATE O FRIO PODER APARECER (O GELO COMUM JA APARECE AOS 2.5)
+#macro FRIO_INTERVALO	(room_speed * 100)	//DEPOIS DE UM FRIO, O PROXIMO VEM EM ATE ISSO
+#macro FRIO_DURACAO		(room_speed * 14)	//QUANTO TEMPO OS BLOCOS FICAM CONGELANDO
+#macro FRIO_VEL			.07					//CHANCE POR FRAME DE CADA BLOCO PARADO CONGELAR (FICA UMA ONDA, NAO TUDO DE UMA VEZ)
+#macro FRIO_VEL_DEGELO	.05					//O MESMO PRO DEGELO
+
+global.frio = 0;			//FRAMES QUE FALTAM DO FRIO (0 = NAO TA CONGELANDO)
+global.frio_ativo = false;	//TODO O EVENTO (AVISO + CONGELANDO + DEGELO): LIGA A VINHETA E A NEVE
+global.frio_espera = 0;		//FRAMES ATE PODER VIR OUTRO
+global.degelo = false;		//O FRIO ACABOU E OS BLOCOS ESTAO DERRETENDO
+global.frio_vis = 0;		//0 A 1: QUANTO O VISUAL JA APARECEU
+global.neve = [];			//FLOCOS { X, Y (0 A 1 DA TELA), V, S, FASE }
+
+//COMEÇOU A PARTIDA (CHAMADO NO CREATE DO OBJ_GAME_CONTROL)
+function frio_iniciar_partida()
+{
+	global.frio = 0;
+	global.frio_ativo = false;
+	global.frio_espera = 0;
+	global.degelo = false;
+	global.frio_vis = 0;
+	global.neve = [];
+}
+
+//O FRIO PODE COMEÇAR AGORA? (NAO EMBOLA COM OUTROS EVENTOS)
+function frio_livre()
+{
+	if(global.frio_ativo or global.tutorial or global.contagem > 0 or global.andar_pausa > 0 or global.onda_timer > 0) return false;
+	if(!is_undefined(global.zq) or zorg_segurando() or desafio_ativo() or instance_exists(obj_onda_laser)) return false;
+	if(instance_exists(obj_game_control) and obj_game_control.onda_restantes > 0) return false;
+	return true;
+}
+
+//APARECE A FRASE NO MEIO DA ARENA E COMEÇA A CONTAGEM. QUANDO ELA ACABA OS BLOCOS COMEÇAM A CONGELAR
+function frio_anunciar()
+{
+	global.frio_espera = FRIO_INTERVALO;
+	global.frio_ativo = true;
+	contagem_iniciar(global.linguagem == 0 ? "ESTÁ FICANDO MUITO FRIO" : "IT'S GETTING VERY COLD", function() { frio_comecar(); });
+	zorg_falar("frio");
+	audio_play_sound(snd_feitico, 1, false, .7, 0, 1.7);
+	shakes(4, 1);
+}
+
+//A CONTAGEM ACABOU: O GELO COMEÇA A TOMAR CONTA
+function frio_comecar()
+{
+	global.frio = FRIO_DURACAO;
+	global.degelo = false;
+	global.flash_linha = .3;
+	audio_play_sound(snd_feitico, 1, false, .8, 0, 1.3);
+	audio_play_sound(snd_jingle_poder, 1, false, .4, 0, 1.6);
+	if(instance_exists(obj_area)) onda_choque(obj_area.x + obj_area.sprite_width / 2, obj_area.y + obj_area.sprite_height / 2, 150, 6, 40);
+}
+
+//TODO FRAME (OBJ_GAME_CONTROL, FORA DA PAUSA)
+function frio_atualizar()
+{
+	//ESPERA E COMEÇA UM NOVO FRIO
+	if(!global.frio_ativo)
+	{
+		if(bloco_liberado(FRIO_LIBERA) and frio_livre())
+		{
+			if(global.frio_espera > 0) global.frio_espera--;
+			else frio_anunciar();
+		}
+		else if(global.frio_espera > 0 and global.tempo_partida >= FRIO_LIBERA * 60) global.frio_espera--;
+		return;
+	}
+	//CONGELANDO: OS BLOCOS NORMAIS VAO VIRANDO GELO, UNS DEPOIS DOS OUTROS
+	if(global.frio > 0)
+	{
+		global.frio--;
+		var _n = 0;
+		with(obj_peca)
+		{
+			if(sou_normal and coloracao >= 0 and !gel_quicando and !sou_fantasma and random(1) < FRIO_VEL)
+			{
+				alarm[1] = -1;
+				sou_gelo = true;
+				sou_normal = false;
+				cor_original = coloracao;
+				coloracao = -1;
+				gelo_frio = true;
+				alpha_fog = 1;
+				esc = 1.15;
+				_n++;
+				if(random(1) < .35)
+				{
+					var _a = instance_create_depth(x, y, -1900, obj_efeito_pontos);
+					_a.modo = "anel";
+					_a.timer = 10;
+				}
+			}
+		}
+		if(_n > 0 and (global.frio mod 4) == 0) audio_play_sound(snd_menu_select_03, 1, false, .25, 0, 1.9 + random(.4));
+		if(global.frio == 0)
+		{
+			global.degelo = true;
+			if(instance_exists(obj_area)) efeito_texto(global.linguagem == 0 ? "DEGELANDO..." : "THAWING...", obj_area.x + obj_area.sprite_width / 2, obj_area.y + 52, #A6E6FF, 1.1);
+		}
+		return;
+	}
+	//DEGELO: OS BLOCOS QUE O FRIO CONGELOU (E AS PEÇAS QUE NASCERAM DE GELO NELE) VOLTAM AO NORMAL
+	if(global.degelo)
+	{
+		var _restam = 0, _n2 = 0;
+		with(obj_peca)
+		{
+			if(variable_instance_exists(id, "gelo_frio") and gelo_frio and sou_gelo)
+			{
+				if(random(1) < FRIO_VEL_DEGELO)
+				{
+					restar_variaveis_blocos();
+					gelo_frio = false;
+					alpha_fog = 1;
+					esc = 1.1;
+					_n2++;
+				}
+				else _restam++;
+			}
+		}
+		if(_n2 > 0 and (current_time div 60) mod 3 == 0) audio_play_sound(snd_menu_select_03, 1, false, .2, 0, 1.2 + random(.3));
+		if(_restam == 0)
+		{
+			global.degelo = false;
+			global.frio_ativo = false;
+		}
+	}
+}
+
+//VISUAL (DRAW GUI): VINHETA AZUL GELADA, UM TOM AZUL NA TELA E NEVE CAINDO
+function frio_desenhar()
+{
+	global.frio_vis = lerp(global.frio_vis, global.frio_ativo ? 1 : 0, .03);
+	if(global.frio_vis < .01) { global.frio_vis = 0; exit; }
+	var _v = global.frio_vis;
+	var _tl = gui_tela();
+	var _w = _tl[2] - _tl[0], _h = _tl[3] - _tl[1];
+	var _e = gui_esc();
+
+	//TOM AZUL E BORDA DE GELO
+	draw_set_alpha(.14 * _v);
+	draw_set_color(#7FC8FF);
+	draw_rectangle(_tl[0], _tl[1], _tl[2], _tl[3], false);
+	draw_set_alpha(1);
+	gpu_set_fog(true, #BFE6FF, 0, 1);
+	draw_sprite_stretched_ext(spr_luneta, 0, _tl[0], _tl[1], _w, _h, c_white, .6 * _v);
+	gpu_set_fog(false, c_white, 0, 1);
+
+	//NEVE: SOBE O NUMERO DE FLOCOS COM O VISUAL E ELES CAEM BALANÇANDO
+	while(array_length(global.neve) < 70 * _v) array_push(global.neve, { x : random(1), y : random(1), v : random_range(.0025, .006), s : choose(1, 1, 2, 2, 3), fase : random(6.28) });
+	for(var i = 0; i < array_length(global.neve); i++)
+	{
+		var _f = global.neve[i];
+		if(!global.game_pause)
+		{
+			_f.y += _f.v;
+			_f.fase += .05;
+			if(_f.y > 1.02) { _f.y = -.02; _f.x = random(1); }
+		}
+		var _fx = _tl[0] + (_f.x + sin(_f.fase) * .008) * _w;
+		var _fy = _tl[1] + _f.y * _h;
+		draw_set_alpha(.85 * _v);
+		draw_set_color(c_white);
+		draw_rectangle(_fx, _fy, _fx + _f.s * _e, _fy + _f.s * _e, false);
+	}
+	draw_set_alpha(1);
+	draw_set_color(c_white);
 }

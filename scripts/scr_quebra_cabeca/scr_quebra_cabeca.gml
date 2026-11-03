@@ -69,6 +69,7 @@ function qc_iniciar()
 {
 	if(!desafio_pode()) return false;
 	instance_create_depth(0, 0, -1600, obj_quebra_cabeca);
+	zorg_falar("minigame");
 	return true;
 }
 
@@ -77,6 +78,7 @@ function enc_iniciar()
 {
 	if(!desafio_pode()) return false;
 	instance_create_depth(0, 0, -1600, obj_encaixe);
+	zorg_falar("minigame");
 	return true;
 }
 
@@ -365,12 +367,16 @@ function enc_peca_sprite(_base, _cor)
 function desafio_premio_letra(_x, _y)
 {
 	if(!modo_arcade()) exit;
+	//NO COOP O PREMIO VAI PRO JOGADOR MAIS PERTO
+	var _pp = player_perto(_x, _y);
+	var _n = (_pp != noone and variable_instance_exists(_pp, "jogador")) ? _pp.jogador : 1;
+	var _l = letras_de(_n);
 	var _faltam = [];
-	for(var i = 0; i < array_length(global.letras); i++) if(!global.letras[i]) array_push(_faltam, i);
+	for(var i = 0; i < array_length(_l); i++) if(!_l[i]) array_push(_faltam, i);
 	if(array_length(_faltam) == 0) exit;
 	var _i = _faltam[irandom(array_length(_faltam) - 1)];
 	with(obj_letra) if(letra == _i) instance_destroy();
 	with(obj_peca) if(letra == _i) letra = -1;
-	letra_coletar(_i, _x, _y);
+	letra_coletar(_i, _x, _y, _n);
 	letra_chamar_atencao(_x, _y - 20, _i);
 }

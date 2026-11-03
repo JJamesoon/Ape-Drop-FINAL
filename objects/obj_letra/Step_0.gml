@@ -1,15 +1,20 @@
-//PAUSADO: A LETRA FICA PARADA
-if(global.game_pause) exit;
+//PAUSADO: A LETRA FICA PARADA (NO TEMPO PARADO O PLAYER AINDA PEGA ELA)
+if(global.game_pause and !tempo_player_livre()) exit;
+var _mov = !global.game_pause;
 
 //ENCOLHE ATE O TAMANHO NORMAL E SOME QUANDO O TEMPO ACABA
-esc = lerp(esc, 1, .12);
-timer--;
-if(timer <= 0) instance_destroy();
+if(_mov)
+{
+	esc = lerp(esc, 1, .12);
+	timer--;
+	if(timer <= 0) instance_destroy();
+}
 
 var _p = player_perto(x, y); //NO COOP, O MAIS PERTO
 
 //IMA: PUXA A LETRA PRO PLAYER
-if(_p != noone and tem_poder("ima") and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
+if(!_mov) { /* TEMPO PARADO: NAO SE MEXE */ }
+else if(_p != noone and tem_poder("ima") and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
 {
 	var _dir = point_direction(x, y, _p.x, _p.y - 10);
 	x += lengthdir_x(3, _dir);
@@ -38,6 +43,6 @@ else
 //PEGOU
 if(_p != noone and _p.estado != state.morte and point_distance(x, y, _p.x, _p.y - 10) < 14)
 {
-	letra_coletar(letra, x, y);
+	letra_coletar(letra, x, y, variable_instance_exists(_p, "jogador") ? _p.jogador : 1);	//CADA JOGADOR TEM AS SUAS LETRAS (REPETIDA VIRA MOEDA)
 	instance_destroy();
 }

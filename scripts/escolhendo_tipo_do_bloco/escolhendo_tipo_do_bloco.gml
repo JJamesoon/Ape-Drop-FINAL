@@ -27,9 +27,9 @@ function escolhendo_tipo_do_bloco(_tipo)
 			}
 			
 			break;
-		//ESPECIAL: 11% DE CHANCE (ERA 6), NO MAXIMO UM NA ARENA
+		//ESPECIAL: 13% DE CHANCE (ERA 6, DEPOIS 11), NO MAXIMO UM NA ARENA
 		case "Especial":
-			_chance = 11;
+			_chance = 13;
 			if(!bloco_liberado(LIBERA_ESPECIAL)) break;
 
 			if(random(100) <= _chance and global.bloco_especial == noone) 

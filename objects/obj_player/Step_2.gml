@@ -4,7 +4,12 @@ if(estado != estado_som)
 	switch(estado)
 	{
 		case state.jump:		if(velv < 0) som_tocar(snd_jump, .1); break;
-		case state.giro:		som_tocar(snd_Giro, .1); giro_contar(); break; //CONTA OS GIROS SEGUIDOS (GIRO DE FOGO)
+		case state.giro:
+			som_tocar(snd_Giro, .1);
+			//GIRO NO AR DEPOIS DE CAIR DE MUITO ALTO: ACENDE O GIRO DE FOGO (SO GIRAR NAO ACENDE, TEM QUE QUEBRAR)
+			if(giro_ar and queda_dist >= GIRO_FOGO_ALTURA) giro_fogo_queda();
+			queda_dist = 0;
+			break;
 		case state.dash:		som_tocar(snd_roll, .1);	break;
 		case state.dano:		som_tocar(hurt3);			break;
 		case state.morte:		som_tocar(snd_player_morte);break;

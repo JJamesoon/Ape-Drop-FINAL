@@ -1,5 +1,5 @@
 //PAUSADO: A ABELHA FICA PARADA
-if(global.game_pause) exit;
+if(pausa_em(x)) exit;
 timer++;
 asa += .5;
 

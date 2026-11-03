@@ -3,7 +3,7 @@
 
 //SEGURA O JOGO UM POUCO E FAZ OS RAIOS DA LINHA VIBRAREM
 pausar_seg(5);
-modificar_raios(7, minha_linha);
+if(minha_linha != noone) modificar_raios(7, minha_linha);
 
 //PRIMEIRO FRAME: PREPARA O TEMPO E O Y DE CADA LINHA
 if(array_length(timer_array) == 0) 
@@ -54,8 +54,9 @@ for(var i = 0; i < qtd; i ++)
 	if(timer_array[i] > 0)
 	{
 		//DRAW_SPRITE_EXT(SPR_EFEITO_LINE_SOLO, TIMER_ARRAY[I], _AREA.X, Y-8, IMAGE_XSCALE, ALT/CEL + .2, 0, C_WHITE, 1);
-		draw_sprite_ext(spr_efeito_line_top, timer_array[i], _area.x, y-8, image_xscale, alt/CEL, 0, c_white, 1);
-		draw_sprite_ext(spr_efeito_line_solo, timer_array[i], _area.x, y-11, image_xscale, alt/CEL, 0, c_white, 1);
+		var _dx = zx == noone ? _area.x : zx;
+		draw_sprite_ext(spr_efeito_line_top, timer_array[i], _dx, y-8, image_xscale, alt/CEL, 0, c_white, 1);
+		draw_sprite_ext(spr_efeito_line_solo, timer_array[i], _dx, y-11, image_xscale, alt/CEL, 0, c_white, 1);
 	}
 
 }

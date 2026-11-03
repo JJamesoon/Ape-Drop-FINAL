@@ -74,16 +74,50 @@ if(estado != state.giro and !tempo_ativo())
 	}
 }
 
-//COOP: CAIU NA CABEÇA DO PARCEIRO -> QUICA, E ELE LEVA SO O EFEITO DO DANO (NAO PERDE VIDA)
+//VERSUS: ESTA AMASSADO (O FANTASMA DO ADVERSARIO PULOU EM CIMA): FICA ACHATADO ATE ACABAR O TEMPO, ENTAO SE LEVANTA COM UM PULINHO
+if(amassado > 0)
+{
+	amassado--;
+	velh = 0;
+	esc_x = 1.8 * sign(image_xscale);
+	esc_y = .3;
+	if(amassado == 0)
+	{
+		esc_x = .7 * sign(image_xscale);
+		esc_y = 1.5;
+		amasso_imune = max(amasso_imune, VS_AMASSO_IMUNE);	//(NO COOP A INVULNERABILIDADE DO PISAO CONTINUA ATE ACABAR OS 5S)
+		velv = -3;
+		estado = state.jump;
+		audio_play_sound(snd_boing, 1, false, .8, 0, 1.3);
+		poeira(x, y + 6, 6);
+	}
+}
+if(amasso_imune > 0) amasso_imune--;
+
+//VERSUS: O FANTASMA CAIU NA CABEÇA DO ADVERSARIO -> QUICA E AMASSA ELE
+if(vs_fantasma and velv > 0 and estado != state.giro)
+{
+	var _alvo = instance_place(x, y + velv + 1, obj_player);
+	if(_alvo != noone and !_alvo.vs_fantasma and _alvo.estado != state.morte and _alvo.amassado <= 0 and _alvo.amasso_imune <= 0 and bbox_bottom <= _alvo.bbox_top + 2 + velv)
+	{
+		y = _alvo.bbox_top - (bbox_bottom - y) - 1;
+		quicar();
+		_alvo.amassar();
+	}
+}
+
+//COOP: CAIU NA CABEÇA DO PARCEIRO (PULANDO OU NO GIRO DO AR) -> QUICA E AMASSA ELE NO CHAO. O AMASSADO FICA INVULNERAVEL
+//COOP_AMASSO_IMUNE (5S) CONTADOS DESDE O PISAO: NAO DA PRA FICAR PISANDO NELE O TEMPO TODO
+#macro COOP_AMASSO_IMUNE	(room_speed * 5)
 if(pisca_dano > 0) pisca_dano--;
-if(global.coop and velv > 0 and estado != state.giro)
+if(global.coop and !vs_fantasma and velv > 0 and (estado != state.giro or giro_ar))
 {
 	var _par = instance_place(x, y + velv + 1, obj_player);
-	if(_par != noone and _par.estado != state.morte and _par.estado != state.dano and bbox_bottom <= _par.bbox_top + 2 + velv)
+	if(_par != noone and !_par.vs_fantasma and _par.estado != state.morte and _par.estado != state.dano and _par.amassado <= 0 and _par.amasso_imune <= 0 and bbox_bottom <= _par.bbox_top + 2 + velv)
 	{
 		y = _par.bbox_top - (bbox_bottom - y) - 1;
 		quicar();
-		_par.efeito_dano(_par.x < x ? -1 : 1);
+		_par.amassar(COOP_AMASSO_IMUNE);
 	}
 }
 
@@ -115,6 +149,24 @@ _jump_giro		= keyboard_check_pressed(imp.giro);
 _jump_giro_press= keyboard_check(imp.giro_press);
 _dash			= keyboard_check_pressed(imp.dash);
 
+//RECUO DO GIRO LATERAL: POR UM TEMPINHO O PLAYER NAO RESPONDE AOS COMANDOS (SO DESLIZA PRA TRAS, FREANDO)
+if(giro_lat_trava > 0 or global.tut_trava or vs_parado or amassado > 0)
+{
+	if(giro_lat_trava > 0) giro_lat_trava--;
+	_left = false; _right = false; _down = false;
+	_soco_press = false; _soco = false; _dash = false;
+	_jump = false; _jump_press = false; _jump_giro = false; _jump_giro_press = false;
+	velh = lerp(velh, 0, .08);
+}
+
+//TUTORIAL: TREINO DE UM GOLPE SO (A VACA TRAVA OS OUTROS: SOCO FRACO, SOCO FORTE E GIRO)
+if(global.tut_sem_fraco) _soco = false;
+if(global.tut_sem_forte) _soco_press = false;
+if(global.tut_sem_giro) { _jump_giro = false; _jump_giro_press = false; }
+
+//ENSINO NATURAL: ANOTA O QUE ELE JA APRENDEU E ESCOLHE A DICA DO MOMENTO (SO APARECE SE ELE TRAVAR NUMA COISA QUE NAO SABE)
+ensino_player_atualizar();
+
 //VIRA PRO LADO QUE TA APERTANDO (MENOS NO MEIO DE UM SOCO)
 if(_left xor _right and estado != state.soco and estado != state.super_soco) 
 {
@@ -142,7 +194,8 @@ if(recarga_dash > 0) recarga_dash--;	//RECARGA DO DASH
 
 //DASH: FUNCIONA NO CHAO E NO AR, COM UM TEMPO DE RECARGA
 var _pode_dash = estado == state.idle or estado == state.idle_mudar_lado or estado == state.in_run or estado == state.run or estado == state.run_stop or estado == state.jump;
-if(_dash and recarga_dash <= 0 and _pode_dash)
+//(O DASH E UM PODER: SO EXISTE SE O JOGADOR ESCOLHEU O PODER DASH)
+if(_dash and tem_poder("dash") and recarga_dash <= 0 and _pode_dash)
 {
 	//DIREÇAO NORMAL DO DASH: PRA FRENTE
 	if(_left xor _right) image_xscale = sign(_right - _left);
@@ -170,6 +223,10 @@ if(_dash and recarga_dash <= 0 and _pode_dash)
 	alpha_fog = .6;
 }
 
+//ALTURA DA QUEDA (PX CAINDO SEM TOCAR NO CHAO NEM SUBIR): O GIRO NO AR DEPOIS DE UMA QUEDA ALTA ACENDE O GIRO DE FOGO
+if(_block or velv < 0) queda_dist = 0;
+else if(estado != state.giro) queda_dist += velv;
+
 //GAMEFEEL: POEIRA QUANDO SAI DO CHAO PULANDO E QUANDO CAI FORTE
 if(_block and !chao_antes and velv_antes > 2.5) { poeira(x, y, 5); esc_x = 1.3 * image_xscale; esc_y = .75; }
 if(!_block and chao_antes and velv < 0) poeira(x, y, 3);
@@ -178,7 +235,7 @@ velv_antes = velv;
 
 //PISOU NO CHAO (FORA DO GIRO): ZERA O QUIQUE EM CADEIA E O PULO DUPLO DAS ASAS
 if(_block and velv >= 0 and estado != state.giro) quique_seq = 0;
-if(_block and velv >= 0) pulo_duplo_usado = false;
+if(_block and velv >= 0) { pulo_duplo_usado = false; giro_lat_livre = true; } //PISOU NO CHAO: LIBERA O GIRO LATERAL DE NOVO
 
 //PODERES: A ENERGIA DO REFLEXO E O ESCUDO RECUPERAM COM O TEMPO
 if(tem_poder("reflexo")) reflexo_energia = min(100, reflexo_energia + REFLEXO_REGEN);
@@ -191,7 +248,7 @@ if(mortal > 0) mortal--;	//TEMPO DO MORTAL DO REFLEXO
 
 //ESPECIAL: BAIXO + SOCO EM CIMA DE UM BLOCO (DESTROI OS BLOCOS DA MESMA COR CONECTADOS)
 var _no_chao = estado == state.idle or estado == state.idle_mudar_lado or estado == state.in_run or estado == state.run or estado == state.run_stop;
-if(_down and _soco and _no_chao and _peca and !_peca.andar)
+if(_down and _soco and _no_chao and _peca and !_peca.andar and !vs_fantasma)
 {
 	especial_usar(_peca);
 	_soco = false; //NAO SOCA NORMAL JUNTO
@@ -200,11 +257,11 @@ if(_down and _soco and _no_chao and _peca and !_peca.andar)
 }
 
 //BAIXO + GIRO EM CIMA DE UMA PEÇA: JA QUEBRA O BLOCO DE BAIXO (SEM PRECISAR PULAR PRO GIRO NO AR)
-if(estado != state.giro) giro_baixo = false;
+if(estado != state.giro) { giro_baixo = false; giro_lat = false; } //SAIU DO GIRO (POR DANO, ETC): ACABA O GIRO LATERAL
 if(_down and _jump_giro and _no_chao and _peca)
 {
 	onda_choque(_peca.x, _peca.y, 32, 3, 16);
-	bloco_golpe(_peca);
+	if(bloco_golpe(_peca)) giro_contar(); //(GIRO DE FOGO: CONTA SO QUANDO QUEBRA)
 	_peca = noone; //NAO EXISTE MAIS (O RESTO DO STEP NAO PODE USAR)
 	_block = solido_inst(x, y + 1);
 	audio_play_sound(snd_hit2, 1, false);
@@ -561,8 +618,14 @@ switch(estado)
 			
 			var _pulou_agora = false;
 
+			//AGARRADO NA PAREDE (ESCORREGANDO COM A TECLA PRO LADO DELA): O PULO AQUI E O WALL JUMP, NAO O COYOTE JUMP.
+			//(ANTES O COYOTE GANHAVA: A PAREDE RENOVA O TIMER_JUMP TODO FRAME, ENTAO O PULO SO IA PRA CIMA, SEM EMPURRAR PRO LADO,
+			//E DAVA PRA ESCALAR A PAREDE PULANDO SEM PARAR. O WALL JUMP DE VERDADE NUNCA RODAVA)
+			var _dir_antes = _right - _left != 0 ? _right - _left : image_xscale;
+			var _agarrado = solido_inst(x + _dir_antes * 2, y) != noone and velv > .2 and (_left xor _right);
+			
 			//COYOTE JUMP
-			if(timer_jump > 0 and _jump)
+			if(timer_jump > 0 and _jump and !_agarrado)
 			{
 				velv = 0;
 				velv -= vel_jump;
@@ -583,6 +646,7 @@ switch(estado)
 			var _parede_gelo = _wall != noone and _wall.object_index == obj_peca and _wall.sou_gelo; //(A PAREDE DA ARENA NAO E BLOCO)
 			if(_na_parede)
 			{
+				timer_jump = coyote_timer;
 				image_xscale = _dir;
 				velv = lerp(velv, _parede_gelo ? GELO_PAREDE_VEL : .3, .2);
 				nova_spr(spr_player_wall);
@@ -591,7 +655,7 @@ switch(estado)
 				    timer_mover = 10;
 					velv = 0;
 				    velv = _parede_gelo ? -GELO_PAREDE_PULO : -(vel_jump);
-				    velh = image_xscale * -1;
+				    velh = image_xscale * -.8;
 					
 					
 				}
@@ -617,7 +681,7 @@ switch(estado)
 				}
 			}
 			//ASAS: SEGUNDO PULO NO AR
-			if(_jump and !_pulou_agora and !_na_parede and !pulo_duplo_usado and tem_poder("asas"))
+			if(_jump and !_pulou_agora and !_na_parede and !pulo_duplo_usado and (tem_poder("asas") or tempo_player_livre())) //(NO TEMPO PARADO TODO MUNDO TEM PULO DUPLO)
 			{
 				velv = -vel_jump;
 				pulo_duplo_usado = true;
@@ -658,11 +722,33 @@ switch(estado)
 				estado = state.super_soco;
 			}
 			
-			//GIRAR
+			//GIRAR (SEGURANDO SHIFT: GIRO LATERAL, SE JOGA PRO LADO ESCOLHIDO. SEM LADO ESCOLHIDO VAI PRA ONDE ESTA OLHANDO)
+			//(COM SHIFT SEGURADO O GIRO LATERAL TEM PRIORIDADE: SE JA USOU E AINDA NAO LIBEROU, NAO FAZ O GIRO NORMAL NO LUGAR)
 			if(_jump_giro)
 			{
-				giro_ar = true;
-				estado = state.giro;
+				if(keyboard_check(vk_shift))
+				{
+					if(giro_lat_livre)
+					{
+						giro_lat = true;
+						giro_lat_livre = false;
+						giro_lat_t = 0;
+						giro_lat_dir = (_left xor _right) ? sign(_right - _left) : sign(image_xscale);
+						if(giro_lat_dir == 0) giro_lat_dir = 1;
+						image_xscale = giro_lat_dir;
+						giro_ar = false;
+						girar_jump = false;
+						velv = 0;
+						esc_x = 1.4 * giro_lat_dir;
+						esc_y = .75;
+						estado = state.giro;
+					}
+				}
+				else
+				{
+					giro_ar = true;
+					estado = state.giro;
+				}
 			}
 			
 		break;
@@ -686,7 +772,7 @@ switch(estado)
 			//NO FRAME 2 DO SOCO CRIA A AREA DE DANO NA FRENTE (ESTICADA PELO SOCO_ALCANCE)
 			if(image_index >= 2 and !dano)
 			{
-				dano = instance_create_layer(x + (8 + 2 * SOCO_ALCANCE) * image_xscale, y - 10, "Player", obj_dano);
+				dano = instance_create_depth(x + (8 + 2 * SOCO_ALCANCE) * image_xscale, y - 10, depth, obj_dano);
 				dano.image_xscale = image_xscale * SOCO_ALCANCE;
 				dano.espiritual = tem_poder("espiritual");
 				
@@ -719,7 +805,7 @@ switch(estado)
 			//IGUAL AO SOCO, MAS A AREA DE DANO E DE SUPER SOCO
 			if(image_index >= 2 and !dano)
 			{
-				dano = instance_create_layer(x + (8 + 2 * SOCO_ALCANCE) * image_xscale, y - 10, "Player", obj_dano);
+				dano = instance_create_depth(x + (8 + 2 * SOCO_ALCANCE) * image_xscale, y - 10, depth, obj_dano);
 				dano.image_xscale = image_xscale * SOCO_ALCANCE;
 				dano.espiritual = tem_poder("espiritual");
 				dano.super = true;
@@ -767,6 +853,71 @@ switch(estado)
 			
 			//GIRO: ATACA GIRANDO. NO CHAO QUEBRA O BLOCO DO LADO, NO AR DESCE RAPIDO E QUEBRA O DE BAIXO
 			image_speed = .9;
+
+			#region GIRO LATERAL (SHIFT + GIRO NO AR)
+			if(giro_lat)
+			{
+				//SE JOGA RETO PRO LADO ESCOLHIDO (SEM CAIR) GIRANDO
+				nova_spr(spr_player_giro);
+				image_speed = giro_lat_anim;
+				if(image_index >= image_number - 1) image_index = 0;
+				velh = giro_lat_dir * giro_lat_vel;
+				velv = 0;
+				giro_lat_t++;
+				
+				//ACHOU ALGO NO CAMINHO? (UM TIQUINHO A FRENTE DE ONDE A VELOCIDADE VAI LEVAR)
+				var _alcance = giro_lat_vel + 1;
+				var _alvo = instance_place(x + giro_lat_dir * _alcance, y - 4, obj_peca);
+				var _parede = place_meeting(x + giro_lat_dir * _alcance, y - 4, obj_block);
+				//INIMIGO VIVO NO CAMINHO (CONTA IGUAL A UM BLOCO)
+				var _ini = instance_place(x + giro_lat_dir * _alcance, y - 4, obj_inimigo);
+				if(_ini != noone and !_ini.vivo()) _ini = noone;
+				if(_alvo != noone or _ini != noone or _parede)
+				{
+					//BLOCO OU INIMIGO: QUEBRA (CADA UM SEGUIDO SEM PISAR NO CHAO AUMENTA OS PONTOS, IGUAL AO GIRO NO AR)
+					if(_alvo != noone or _ini != noone)
+					{
+						var _quebrado = _alvo != noone ? _alvo : _ini;
+						quique_seq++;
+						if(_alvo != noone) _alvo.pontos_mult = quique_seq;
+						if(quique_seq >= 2) efeito_texto("x" + string(quique_seq), x, y - 26, c_orange, 1 + .12 * min(quique_seq, 6));
+						onda_choque(_quebrado.x, _quebrado.y, 32, 3, 16);
+						audio_play_sound(snd_hit2, 1, false, 1, 0, 1 + min(quique_seq, 10) * .08);
+						if(quique_seq >= 2) som_nota(3 + min(quique_seq, 10), .5);
+						shakes(3, 1);
+						if(_alvo != noone) { if(bloco_golpe(_alvo)) giro_contar(); } //A PEDRA SO RACHA NO PRIMEIRO GOLPE (GIRO DE FOGO: CONTA SO QUANDO QUEBRA)
+						else _ini.morrer_nocaute(giro_lat_dir, true); //INIMIGO: VOA PRO LADO DO GOLPE
+						giro_lat_livre = true; //QUEBROU ALGO: PODE EMENDAR OUTRO GIRO LATERAL
+						hitstop(giro_lat_hitstop); //HITSTOP: O JOGO CONGELA UM INSTANTE NO IMPACTO (SENSACAO DE GOLPE FORTE)
+					}
+					else
+					{
+						//PAREDE OU CHAO SOLIDO: NAO QUEBRA, SO BATE E VOLTA
+						audio_play_sound(snd_hit, 1, false, .8, 0, 1.2);
+					}
+					//VOLTA PRO PULO: PULINHO PRA CIMA E UM EMPURRAOZINHO PRA TRAS
+					giro_lat = false;
+					giro_lat_trava = giro_lat_trava_tempo; //SEM CONTROLE DURANTE O RECUO
+					velv = -giro_lat_pulo;
+					velh = -giro_lat_dir * giro_lat_recuo;
+					girar_jump = true;
+					esc_x = .8 * image_xscale;
+					esc_y = 1.3;
+					estado = state.jump;
+					break;
+				}
+				
+				//ACABOU O GIRO LATERAL SEM BATER EM NADA: VOLTA A CAIR
+				if(giro_lat_t >= giro_lat_tempo)
+				{
+					giro_lat = false;
+					velh = giro_lat_dir * vel_run;
+					girar_jump = false;
+					estado = state.jump;
+				}
+				break;
+			}
+			#endregion
 			
 			mover(vel_giro, .2);
 			
@@ -811,8 +962,10 @@ switch(estado)
 						onda_choque(_peca.x, _peca.y, 32, 3, 16);
 						audio_play_sound(snd_hit2, 1, false, 1, 0, 1 + min(quique_seq, 10) * .08);
 						if(quique_seq >= 2) som_nota(3 + min(quique_seq, 10), .5); //QUIQUE SEGUIDO: NOTA SUBINDO
-						if(_peca.object_index == obj_peca) bloco_golpe(_peca); //A PEDRA SO RACHA NO PRIMEIRO (MAS QUICA IGUAL)
+						var _quebrou = true;
+						if(_peca.object_index == obj_peca) _quebrou = bloco_golpe(_peca); //A PEDRA SO RACHA NO PRIMEIRO (MAS QUICA IGUAL)
 						else instance_destroy(_peca);
+						if(_quebrou) giro_contar(); //GIRO DE FOGO: CONTA SO QUANDO QUEBRA
 						velv = 0;
 						velv -=  _jump_press ? vel_jump * GIRO_QUIQUE_FORTE : vel_jump; //SEGURANDO O PULO QUICA MAIS ALTO
 						estado = state.jump;
@@ -842,7 +995,7 @@ switch(estado)
 				if(_peca)
 				{
 					onda_choque(_peca.x, _peca.y, 32, 3, 16);
-					bloco_golpe(_peca);
+					if(bloco_golpe(_peca)) giro_contar(); //GIRO DE FOGO: CONTA SO QUANDO QUEBRA
 				}
 				
 				//ACABOU A ANIMAÇAO: VOLTA A CORRER OU DERRAPA
@@ -862,7 +1015,7 @@ switch(estado)
 			var _peca = instance_place(x + image_xscale, y, obj_peca);
 			if(image_index >= 1 and !dano)
 			{
-				dano = instance_create_layer(x + (8 + 2 * SOCO_ALCANCE) * image_xscale, y - sprite_height/2, "Player", obj_dano);
+				dano = instance_create_depth(x + (8 + 2 * SOCO_ALCANCE) * image_xscale, y - sprite_height/2, depth, obj_dano);
 				dano.image_xscale = image_xscale * SOCO_ALCANCE;
 				dano.espiritual = tem_poder("espiritual");
 			}

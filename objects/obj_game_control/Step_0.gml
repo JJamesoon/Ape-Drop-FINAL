@@ -15,6 +15,11 @@ var _down	= keyboard_check_pressed(ord("S")) or keyboard_check_pressed(vk_down);
 var _enter	= keyboard_check_pressed(vk_space) or keyboard_check_pressed(vk_enter) or (MOBILE and keyboard_check_pressed(global.imputs.soco));
 var _voltar	= keyboard_check_pressed(vk_escape);
 
+//TUTORIAL DA DONA MALHADA (SCR_PODERES): AS FALAS E AS METAS. NAO RODA NA PAUSA
+if(global.tutorial and !pausado and !menu_poder) tutorial_atualizar();
+//ZORG: A FRASE NO TOPO DA TELA (SCR_PODERES)
+if(!pausado and !menu_poder) zorg_atualizar();
+
 #region FIM DE JOGO (TELA DE RESULTADO)
 if(_player_morto and !fim_jogo)
 {
@@ -23,6 +28,8 @@ if(_player_morto and !fim_jogo)
 	if(timer_fim > room_speed * 1.5)
 	{
 		fim_jogo = true;
+		if(modo_versus() and !global.vs_contou and global.vs_perdedor > 0) { global.vs_contou = true; global.vs_vitorias[2 - global.vs_perdedor]++; } //VERSUS: UMA VITORIA PRA QUEM FICOU
+		zorg_falar("morte", true);
 		recorde_checar();
 		novo_recorde = recorde_atual() > recorde_inicio and global.pontos_1 > 0;
 		jogo_salvar();
@@ -68,7 +75,7 @@ if(fim_jogo)
 
 #region MENU DE DEBUG DOS BLOCOS (ENTER)
 //ENTER NO ARCADE: PAUSA O JOGO E ABRE A LISTA DE BLOCOS. SETAS ESCOLHEM, ENTER FAZ ESSE BLOCO NASCER AGORA, ESC FECHA
-if(DEBUG_BLOCOS and modo_arcade())
+if(DEBUG_BLOCOS and modo_arcade() and !global.tutorial and !modo_versus())
 {
 	//TECLA APERTADA (NO TESTE AUTOMATICO O OBJ_TESTE_AUTO "APERTA" PELA GLOBAL.TESTE_TECLA, QUE E GASTA AQUI)
 	var _tecla = function(_k)
@@ -151,7 +158,7 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 	{
 		if(_up xor _down)
 		{
-			opcao_pause = (opcao_pause + _down - _up + 4) mod 4;
+			opcao_pause = (opcao_pause + _down - _up + 7) mod 7;
 			som_tocar(snd_menu_select_03);
 		}
 		if(keyboard_check_pressed(ord("R"))) { reiniciar(); exit; }
@@ -163,8 +170,20 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 			{
 				case 0: pausado = false; break;
 				case 1: ver_comandos = true; break;
-				case 2: reiniciar(); exit;
-				case 3: voltar_menu(); exit;
+				case 2:	//REFAZER O TUTORIAL DA DONA MALHADA (SO NO ARCADE SOLO)
+					if(global.coop or MOBILE or modo_versus()) { som_tocar(snd_menu_erro_04); break; }
+					global.tutorial_forcar = true;
+					global.teste_dif = false;
+					reiniciar();
+					exit;
+				case 3: global.mostrar_teclas = !global.mostrar_teclas; jogo_salvar(); break; //LIGA/DESLIGA A TIRA DE COMANDOS
+				case 4:	//TESTE DE DIFICULDADE: LIGA/DESLIGA E REINICIA NA HORA (LIGADO: LEVEL 3 E 20 MIN, TODOS OS BLOCOS)
+					if(modo_versus() or MOBILE) { som_tocar(snd_menu_erro_04); break; }
+					global.teste_dif = !global.teste_dif;
+					reiniciar();
+					exit;
+				case 5: reiniciar(); exit;
+				case 6: voltar_menu(); exit;
 			}
 		}
 	}
@@ -183,11 +202,12 @@ if(global.palavra_festa > 0 and !pausado)
 	with(obj_area) if(alarm[0] > 0) alarm[0]++;
 	with(obj_cria_peca) if(alarm[0] > 0) alarm[0]++;
 }
-if(!menu_poder and !pausado and !_player_morto and modo_arcade() and letras_completas() and global.palavra_festa <= 0)
+if(!menu_poder and !pausado and !_player_morto and modo_arcade() and !modo_versus() and (letras_completas() or (global.coop and letras_completas(2))) and global.palavra_festa <= 0)
 {
 	if(!palavra_festejada)
 	{
 		palavra_festejada = true;
+		zorg_falar("palavra");
 		global.palavra_festa = PALAVRA_FESTA;
 		shakes(6, 2);
 		with(obj_borda) onda_choque(x + dx_hud + 212, y + 215, 70, 5, 30);
@@ -213,13 +233,14 @@ if(menu_poder)
 	else if(_enter or keyboard_check_pressed(global.imputs.soco)) poder_menu_escolher();
 }
 alpha_menu = lerp(alpha_menu, menu_poder ? 1 : 0, .25);
-#endregion
 
 #region PODER DE PARAR O TEMPO (ENERGIA CHEIA + TECLA 1, SCR_PODERES)
 if(TESTE_ENERGIA and global.tempo_fase == "") global.energia = ENERGIA_MAX; //TESTE: BARRA SEMPRE CHEIA
-if(modo_arcade() and !pausado and !menu_poder and !_player_morto and global.palavra_festa <= 0 and global.andar_pausa <= 0 and !global.quebra_parado and keyboard_check_pressed(TEMPO_TECLA))
+if(keyboard_check_pressed(ord("2")) and global.tempo_fase == "") global.energia = ENERGIA_MAX; //TESTE: TECLA 2 ENCHE A BARRA DO ESPECIAL
+if(modo_arcade() and !modo_versus() and !pausado and !menu_poder and !_player_morto and global.palavra_festa <= 0 and global.andar_pausa <= 0 and !global.quebra_parado and keyboard_check_pressed(TEMPO_TECLA))
 {
 	if(global.tempo_fase == "" and global.energia >= ENERGIA_MAX) tempo_parar();
+	else if(global.tempo_fase == "parado") tempo_encerrar(); //APERTOU DE NOVO: ENCERRA ANTES E POUPA A ENERGIA
 	else if(global.tempo_fase == "") som_tocar(snd_menu_erro_04); //SEM A ENERGIA CHEIA
 }
 if(!pausado and !menu_poder and !_player_morto and global.congelar <= 0) tempo_atualizar();
@@ -249,7 +270,15 @@ if(pause_timer > 0)
 
 //TIMERS
 //TEMPO DE PARTIDA (SEGUNDOS) E OS EFEITOS QUE ACABAM SOZINHOS
-global.tempo_partida += 1 / room_speed;
+if(!global.tutorial) global.tempo_partida += 1 / room_speed; //(NO TUTORIAL O RELOGIO FICA ZERADO)
+global.ensino_t++;
+//A CADA MINUTO DE PARTIDA (ATE O TEMPO PARAR DE ACELERAR AS PEÇAS) AVISA QUE FICOU MAIS RAPIDO
+var _min_atual = floor(global.tempo_partida / 60);
+if(_min_atual > min_aviso)
+{
+	min_aviso = _min_atual;
+	if(modo_arcade() and !modo_versus() and _min_atual <= TEMPO_ACELERA_MAX / TEMPO_ACELERA) velocidade_aviso();
+}
 if(global.efeito_lento > 0)	global.efeito_lento--;
 if(global.efeito_rapido > 0)	global.efeito_rapido--;
 if(global.raio > 0)				global.raio--;
@@ -258,7 +287,7 @@ if(global.febre > 0)			global.febre--;
 if(global.febre <= 0)			global.febre_rapida = false;
 
 //MODO QUEBRA-CABEÇA: PODE APARECER SOZINHO (SCR_QUEBRA_CABECA)
-if(modo_arcade()) qc_sortear();
+if(modo_arcade() and !modo_versus() and !global.tutorial) qc_sortear();
 
 //CONTAGEM DE 3S ANTES DE ACELERAR: BIPA A CADA SEGUNDO E NO FIM ACELERA
 if(global.contagem > 0)
@@ -277,7 +306,7 @@ if(global.onda_timer > 0)		global.onda_timer--;
 if(global.peca_acelerada_timer > 0) global.peca_acelerada_timer--;
 
 //LETRAS D R O P (SO NO ARCADE): DE TEMPOS EM TEMPOS APARECE UMA QUE FALTA
-if(modo_arcade())
+if(modo_arcade() and !modo_versus())
 {
 	letra_timer--;
 	if(letra_timer <= 0)
@@ -288,7 +317,7 @@ if(modo_arcade())
 }
 
 //ONDA DE PEÇAS (SO NO ARCADE): AVISO, DEPOIS VARIAS PEÇAS EM SEQUENCIA, DEPOIS ACALMA
-if(modo_arcade() and instance_exists(obj_area))
+if(modo_arcade() and !modo_versus() and instance_exists(obj_area))
 {
 	//ONDA EM ANDAMENTO: SOLTA UMA PEÇA A CADA ONDA_ESPACO FRAMES
 	if(onda_restantes > 0)
@@ -323,7 +352,7 @@ if(modo_arcade() and instance_exists(obj_area))
 }
 
 //PEÇAS DUPLAS (SO NO ARCADE): DE TEMPOS EM TEMPOS, POR DUPLA_DURACAO, CADA PEÇA VEM COM OUTRA LOGO ATRAS (OBJ_AREA)
-if(modo_arcade())
+if(modo_arcade() and !modo_versus())
 {
 	if(global.dupla_timer > 0) global.dupla_timer--;
 	else if(onda_restantes == 0 and global.contagem <= 0 and !desafio_ativo() and !instance_exists(obj_onda_laser))
@@ -341,18 +370,22 @@ if(modo_arcade())
 }
 
 //ONDA DE LASER (SO NO ARCADE): NAO VEM JUNTO COM A ONDA DE PEÇAS, A CONTAGEM OU UM DESAFIO (ESPERA ELES ACABAREM)
-if(modo_arcade() and !instance_exists(obj_onda_laser))
+if(modo_arcade() and !modo_versus() and !instance_exists(obj_onda_laser))
 {
 	if(laser_proxima > 0) laser_proxima--;
 	else if(onda_restantes == 0 and global.contagem <= 0 and global.onda_timer <= 0 and !desafio_ativo())
 	{
 		laser_proxima = LASER_ONDA_INTERVALO;
 		instance_create_depth(0, 0, -2050, obj_onda_laser);
+		zorg_falar("laser");
 	}
 }
 
+//FRIO (SO NO ARCADE): "ESTA FICANDO MUITO FRIO" E OS BLOCOS VIRAM GELO POR UM TEMPO (CRIAR_PECAS, FRIO_*)
+if(modo_arcade() and !modo_versus()) frio_atualizar();
+
 //BLOCO NOVO DESCOBERTO (PRIMEIRA VEZ QUE O JOGADOR VE ESSE BLOCO, EM QUALQUER PARTIDA): AVISO NA TELA
-if(modo_arcade() and (current_time div 166) mod 2 == 0) blocos_procurar_novos();
+if(modo_arcade() and !modo_versus() and (current_time div 166) mod 2 == 0) blocos_procurar_novos();
 
 //MARCANDO OS GRUPOS QUE O ESPECIAL PODE DESTRUIR (BRILHO AZUL NOS BLOCOS)
 timer_marcar++;
@@ -376,7 +409,7 @@ if(instance_exists(obj_area))
 	
 	//PERIGO: TEM BLOCO PARADO NAS 4 LINHAS DE CIMA DA ARENA
 	global.perigo = _mais_alto < obj_area.y + CEL * 4;
-	if(global.perigo and !_antes) som_tocar(snd_menu_erro_03);
+	if(global.perigo and !_antes) { som_tocar(snd_menu_erro_03); zorg_falar("perigo"); }
 	
 	//ALTURA DA PILHA (0 VAZIA, 1 NO TOPO): A MUSICA ACELERA CONFORME ELA SOBE
 	global.altura_pilha = (_fundo - _mais_alto) / obj_area.sprite_height;
@@ -384,9 +417,19 @@ if(instance_exists(obj_area))
 
 #region TELEPORTE DA PEÇA ATUAL
 //TECLA DE TELEPORTE: A PEÇA ATUAL CAI NA HORA ATE ONDE DER (SCR_FILA)
-if(keyboard_check_pressed(global.imputs.acelerar))
+if(modo_versus())
+{
+	for(var _n = 1; _n <= 2; _n++)
+	{
+		if(global.vs_perdedor != 0) break;
+		if(keyboard_check_pressed(imputs_jogador(_n).acelerar)) versus_teleporte(_n);
+		if(keyboard_check_pressed(versus_tecla_poder(_n))) versus_poder_alternar(_n); //PODER DO FANTASMA (SCR_COOP)
+	}
+}
+else if(keyboard_check_pressed(global.imputs.acelerar))
 {
 	teleporte_acionar();
+	habil_aprender("teleporte"); //TIRA DE COMANDOS: DESCOBRIU O TELEPORTE
 }
 #endregion
 

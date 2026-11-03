@@ -1,18 +1,63 @@
 //ARENA DO ARCADE: CRIA A BORDA, GUARDA A GRADE (GLOBAL.GRID) E CRIA AS PEÇAS
 //DEPTH = 999;
+//ESSE OBJETO E A GRADE DO ARCADE E TAMBEM O "MOTOR" QUE OS OUTROS MODOS HERDAM (OBJ_AREA_COOP E OBJ_AREA_VERSUS SAO FILHOS DELE):
+//CADA FILHO AJEITA O QUE E SO DELE (TAMANHO DA ARENA, JOGADORES, ZONAS) E CHAMA EVENT_INHERITED() PRA USAR O RESTO DAQUI.
+//OS FILHOS TROCAM DUAS FUNÇOES DESTE OBJETO: DESENHAR_FUNDO (O FUNDO DA ARENA) E DETECTAR_LINHAS (QUANDO UMA LINHA FECHA)
 //CRIANDO A BORDA
-//COOP (RM_COOP): A ARENA E MAIS LARGA (16 COLUNAS)
-if(room == rm_coop) { sprite_index = spr_area_coop; mask_index = spr_area_coop; }
 
 //ENCAIXA A LINHA DOS ANDARES NA ARENA
 var _minha_linha = instance_place(x, y, obj_linha);
 if(_minha_linha) _minha_linha.x = x - CEL/2;
 
-minha_borda = instance_create_depth(x, y, -1000, obj_borda);
-minha_borda.sprite_index = modo_arcade() ? spr_borda : spr_borda_vesus;
-minha_borda.dx_hud = sprite_width - sprite_get_width(spr_area);	//ARENA MAIS LARGA (COOP): O PAINEL VAI PRA DIREITA
+//A BORDA E O HUD DO ARCADE E DO COOP. O VERSUS NAO USA (O HUD DELE E DESENHADO PELO PROPRIO OBJ_AREA_VERSUS): O FILHO DESLIGA USA_BORDA ANTES
+if(!variable_instance_exists(id, "usa_borda")) usa_borda = true;
+minha_borda = noone;
+if(usa_borda)
+{
+	minha_borda = instance_create_depth(x, y, -1000, obj_borda);
+	minha_borda.sprite_index = modo_arcade() ? spr_borda : spr_borda_vesus;
+	minha_borda.dx_hud = sprite_width - sprite_get_width(spr_area);	//ARENA MAIS LARGA (COOP): O PAINEL VAI PRA DIREITA
+}
 
 timer_combo = 0; //TEMPO DE .5 SEG PRA ENTRAR MAIS UMA LINHA PA GERA UM COPMBO
+
+//FUNDO DA ARENA (CHAMADO NO DRAW): O PRETO MEIO TRANSPARENTE POR CIMA DA PAREDE DE AZULEJOS E A BORDA DE TRAS. O VERSUS TROCA POR OUTRO
+desenhar_fundo = function(_sx, _sy)
+{
+	//DENTRO DA ARENA: UM PRETO MEIO TRANSPARENTE POR CIMA DA PAREDE DE AZULEJOS (IGUAL AO PROJETO ANTIGO), PROS BLOCOS APARECEREM
+	if(modo_arcade())
+	{
+		draw_set_alpha(FUNDO_ARENA);
+		draw_set_color(c_black);
+		draw_rectangle(x + _sx, y + _sy, x + sprite_width - 1 + _sx, y + sprite_height - 1 + _sy, false);
+		draw_set_alpha(1);
+		draw_set_color(c_white);
+	}
+	//FUNDO DA ARENA
+	if(modo_arcade()) borda_desenhar(spr_borda, 0, x + _sx, y + _sy, sprite_width - sprite_get_width(spr_area));
+	else draw_sprite(spr_borda_vesus, 0, x + _sx, y + _sy);
+}
+
+//DETECTANDO LINHAS COMPLETAS (CHAMADO NO DRAW): TODAS AS CELULAS DA LINHA COM 1 NA GRID. A LIMPEZA (EFEITO, PONTOS, CHAO E CONTAGEM
+//DO ANDAR) FICA NO LIMPAR_LINHAS(). O VERSUS TROCA POR OUTRO (UMA DETECÇAO POR ZONA)
+detectar_linhas = function()
+{
+	var _linhas = [];
+	for(var j = 0; j < lins; j++)
+	{
+		var _completa = true;
+		for(var i = 0; i < cols; i++)
+		{
+			if(global.grid[# i, j] != 1)
+			{
+				_completa = false;
+				break;
+			}
+		}
+		if(_completa) array_push(_linhas, j);
+	}
+	if(timer_reset == 0 and array_length(_linhas) > 0) limpar_linhas(_linhas);
+}
 
 cel = CEL;	//TAMANHO DA CELULA
 cols = sprite_width div cel;	//QUANTAS COLUNAS CABEM NA ARENA
@@ -124,14 +169,26 @@ criar_bloco = function()
 	if(_cheia)
 	{
 		topo_cheio_vezes++;
-		if(topo_cheio_vezes >= 2 and IMORTAL) { with(obj_peca) instance_destroy(); topo_cheio_vezes = 0; } //MODO DE TESTE: SO LIMPA
+		if(topo_cheio_vezes >= 2 and (IMORTAL or global.tutorial)) { with(obj_peca) instance_destroy(); topo_cheio_vezes = 0; } //MODO DE TESTE: SO LIMPA
 		else if(topo_cheio_vezes >= 2) with(obj_player) morrer();
 		exit;
 	}
 	topo_cheio_vezes = 0;
 	
+	//ABERTURA: AS PRIMEIRAS PEÇAS SAO SEMPRE AS MESMAS, NA COLUNA CERTA (CRIAR_PECAS)
+	var _abertura = abertura_ativa();
+	if(_abertura)
+	{
+		var _ab = global.abertura_pecas[global.abertura_i];
+		global.prox_tipo = _ab[0];
+		global.prox_cor = _ab[1];
+		global.prox_especie = "normal";
+		global.prox_fantasmas = 0;
+		global.prox_gelo = false;
+		global.debug_bloco = "";
+	}
 	//COLUNA SORTEADA (MENOS CHANCE ENCOSTADA NA PAREDE), DUAS CASAS ACIMA DA ARENA
-	var _escolha = colunas_sorteadas(global.prox_tipo)[0];
+	var _escolha = _abertura ? { col : global.abertura_pecas[global.abertura_i][2], lado : 0 } : colunas_sorteadas(global.prox_tipo)[0];
 	var _x = (x + cel/2) + cel * _escolha.col;
 	var _y = (y + cel/2) - cel*2;
 	
@@ -146,6 +203,7 @@ criar_bloco = function()
 		 //_X = (X + CEL/2) + (16*5);
 		var _criador = instance_create_layer(_x, _y, "Linha", obj_cria_peca);
 		lado_ultimo = _escolha.lado;
+		if(_abertura) { global.abertura_i++; global.abertura_marca = true; }
 	}
 }
 //PEÇA DA ONDA: NASCE NUMA COLUNA ONDE ELA CABE, SEM ESPERAR A AREA DE CRIAÇAO TODA ESVAZIAR
@@ -211,7 +269,10 @@ criar_bloco_fantasma = function()
 //FICAVAM MARCADAS NA GRID (2 = SENDO DESTRUIDA) SEM EFEITO NENHUM E NUNCA MAIS FECHAVAM
 limpar_linhas = function(_linhas)
 {
+	habil_aprender("linha"); //ENSINO NATURAL: JA SABE FECHAR LINHA
+	global.tut_linha = true; //TUTORIAL: FECHOU A LINHA
 	var _n = array_length(_linhas);
+	if(_n >= 3) zorg_falar("combo"); //ZORG: FECHOU 3 LINHAS OU MAIS DE UMA VEZ
 	var _regua = instance_exists(obj_linha) ? instance_nearest(x + sprite_width/2, y, obj_linha) : noone;
 	var _regua_y = _regua != noone ? floor(_regua.y) : infinity;
 	
@@ -266,9 +327,3 @@ contagem_blocos = function(_tipo)
 	blocos_cx[blocos_caixa.alpha][_tipo] = 1;
 }
 
-//COOP (RM_COOP): A ROOM NAO TEM PLAYER. O PLAYER 1 NASCE NO MEIO DO CHAO DA ARENA E ELE MESMO CRIA O PLAYER 2
-if(room == rm_coop and !instance_exists(obj_player))
-{
-	global.coop = true;
-	instance_create_layer(x + sprite_width / 2 - CEL * 2, y + sprite_height, "Blocos", obj_player);
-}

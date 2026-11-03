@@ -30,6 +30,8 @@ function fila_avancar()
 //TIRA UMA PEÇA DA FILA (SE FOR A ATUAL, A PROXIMA ASSUME)
 function fila_remover(_peca)
 {
+	//VERSUS: CADA ZONA TEM A SUA FILA
+	if(room == rm_versus) { var _z = versus_zona_x(_peca.x); if(_z >= 0) fila_remover_zona(obj_area.zonas[_z], _peca); exit; }
 	if(_peca == global.peca_inst)
 	{
 		fila_avancar();
@@ -44,6 +46,8 @@ function fila_remover(_peca)
 //COLOCA UMA PEÇA NOVA NA FILA (SE NAO TIVER ATUAL, ELA JA VIRA A ATUAL)
 function fila_adicionar(_peca)
 {
+	//VERSUS: CADA ZONA TEM A SUA FILA
+	if(room == rm_versus) { var _z = versus_zona_x(_peca.x); if(_z >= 0) fila_adicionar_zona(obj_area.zonas[_z], _peca); exit; }
 	if(!instance_exists(global.peca_inst)) global.peca_inst = _peca;
 	else array_push(global.prox_peca_int, _peca);
 }

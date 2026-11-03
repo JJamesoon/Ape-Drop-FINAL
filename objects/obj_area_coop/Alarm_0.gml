@@ -1,3 +1,2 @@
-//COOP: CRIA UMA PEÇA A CADA 2 SEGUNDOS
-criar_bloco();
-alarm[0] = room_speed*2;
+//DO COOP: USA O DO OBJ_AREA
+event_inherited();

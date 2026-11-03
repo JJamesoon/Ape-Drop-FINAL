@@ -7,6 +7,7 @@
 var _peca = instance_place(x, y, obj_peca)
 if(_peca) instance_destroy(_peca);
 
+tempo_q = 0;		//TEMPO PARADO: QUANTOS PIXELS ESSE BLOCO CAI QUANDO O TEMPO VOLTAR (PRA PREVIA)
 escorregar_player = 0; //TEMPO QUE TEM PRA ESCORREGAR O PLAYERE NO TELEPORTE
 
 
@@ -62,6 +63,7 @@ velh = 0;
 velv = 0;
 casas = 0;	//CASAS QUE AINDA VAI ANDAR PRO LADO
 vel  = .8; //VELOCIDADE DA DESCIDA DE UMA CASA PRA OUTRA (ERA .7, ANTES 1)
+#macro PECA_ACELERADA_EXTRA	2	//PX A MAIS POR FRAME NA PEÇA QUE O PLAYER ESTA FAZENDO DESCER (SEGURANDO BAIXO EM CIMA DELA)
 #macro SENSOR_AVISO	24	//FRAMES QUE O BLOCO SENSOR TREME DEPOIS DE SE REVELAR, ANTES DE SE LANÇAR
 vel_raivoso = 1.2; //A PEÇA RAIVOSA CAI DIRETO, SEM PARAR (ERA 2, DEPOIS 1.4. NAO DIVIDE OS 16PX: ELA SO ENCAIXA NA GRADE QUANDO PARA)
 andar = false;	//TRUE ENQUANTO ESTA DESCENDO DE UMA CASA PRA OUTRA
@@ -86,6 +88,7 @@ timer_move = meu_timer;	//CONTAGEM ATE DESCER A PROXIMA CASA
 	pedra_imune		= 0;	 //FRAMES SEM LEVAR GOLPE DEPOIS DE RACHAR
 	cor_original	= -1;	 //A PEDRA NAO TEM COR: GUARDA A COR DA PEÇA PRA VOLTAR SE DEIXAR DE SER PEDRA
 	sou_gelo		= false; //BLOCO DE GELO (A PEÇA INTEIRA): O PLAYER ESCORREGA EM CIMA DELE
+	gelo_frio		= false; //O GELO VEIO DO EFEITO DE FRIO (DERRETE QUANDO ELE ACABA)
 	sou_colmeia		= false; //COLMEIA: PARADA, SOLTA ABELHAS QUE VAO NO BLOCO MAIS PERTO E SE DESTROEM COM ELE
 	colmeia_timer	= 0;	 //FRAMES ATE A PROXIMA ABELHA
 	sou_lento		= false; //LENTO: DESTRUIDO SEM SER PELO PLAYER (LINHA, LASER...), JOGA O FEITIÇO DE LENTIDAO NO PLAYER
@@ -168,7 +171,8 @@ velocidade_h = function(_casas = -1, _super = false, _posso_andar = false)
 {
 	//PEÇA RAIVOSA CAINDO NAO PODE SER EMPURRADA: ELA DESCE SEM PARAR E, EMPURRADA NO MEIO DA QUEDA,
 	//ENTRAVA DENTRO DA PEÇA DO LADO. SO PISCA PRA MOSTRAR QUE NAO DEU
-	if(sou_raivoso)
+	//(NO TEMPO PARADO ELA TA PARADA NO AR E DA PRA EMPURRAR)
+	if(sou_raivoso and !tempo_ativo())
 	{
 		var _todos = irmandade ? irmaos() : [id];
 		for(var i = 0; i < array_length(_todos); i++)
@@ -176,6 +180,17 @@ velocidade_h = function(_casas = -1, _super = false, _posso_andar = false)
 			_todos[i].alpha_fog = 1;
 			_todos[i].esc = 1.15;
 		}
+		return;
+	}
+	
+	//AINDA ESTA DESLIZANDO DE UM EMPURRAO ANTERIOR: OUTRO EMPURRAO NESSA HORA SOMAVA EM CIMA DE UMA POSIÇAO QUE NAO FECHA NA GRADE E O
+	//BLOCO FICAVA PRA SEMPRE DESALINHADO (UM BLOCO "DENTRO" DO OUTRO, PRINCIPALMENTE NO COOP, COM DOIS JOGADORES SOCANDO). SO PISCA
+	var _andando = abs(x - prox_x) > .5;
+	if(!_andando and irmandade) { var _irm = irmaos(); for(var k = 0; k < array_length(_irm); k++) if(abs(_irm[k].x - _irm[k].prox_x) > .5) _andando = true; }
+	if(_andando)
+	{
+		alpha_fog = 1;
+		esc = 1.15;
 		return;
 	}
 	

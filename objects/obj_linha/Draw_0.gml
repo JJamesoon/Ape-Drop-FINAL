@@ -65,8 +65,9 @@ draw_set_alpha(1);
 draw_set_color(c_white);
 
 //AS DUAS CAPSULAS NAS PONTAS
-draw_sprite(spr_laser_cpsula, 0, x - 10 + shake_x, y + shake_y);
-draw_sprite(spr_laser_cpsula, 1, _x2, y + shake_y);
+//(A ARTE NOVA SAO DUAS CAIXAS 26X23 COM A SETA PRA DENTRO DA ARENA, COM A ORIGEM NO CANTO: CENTRA NO FEIXE E ENCOSTA NA BORDA)
+draw_sprite(spr_laser_cpsula, 0, _x1 - 18, _yy - 11);
+draw_sprite(spr_laser_cpsula, 1, _x2 - 4, _yy - 11);
 
 //FAISCAS DOURADAS (NA FRENTE DA REGUA)
 for(var i = 0; i < array_length(faiscas); i++)

@@ -17,7 +17,7 @@ pulo_trampolim = false;	//SUBINDO PELO TRAMPOLIM (OU PELO EMPURRAO) DA GELATINA:
 timer_mover = 0;	//DEPOIS DO WALL JUMP NAO DA PRA CONTROLAR UNS FRAMES
 timer_push = 0;	//TEMPO EMPURRANDO UMA PEÇA ANTES DO EMPURRAO
 timer_jump = 0;	//COYOTE JUMP RESTANTE
-coyote_timer = 6;	//FRAMES DE COYOTE JUMP
+coyote_timer = 10;	//FRAMES DE COYOTE JUMP
 
 //SPRITE
 //SPR_PLAYER = GLOBAL.SKIN_PLAYER_1;
@@ -83,12 +83,14 @@ enum state
 //ANDA PRO LADO DAS TECLAS (_LERP = QUAO RAPIDO CHEGA NA VELOCIDADE)
 mover = function(_vel, _lerp = .7)
 {
+	if(giro_lat_trava > 0 or global.tut_trava or vs_parado or amassado > 0) exit; //SEM CONTROLE (RECUO DO GIRO LATERAL): NAO ANDA PELAS TECLAS
 	
 	var _left, _right;
 	
 	 _left	= keyboard_check(imp.left);
 	 _right	= keyboard_check(imp.rigth);
 	
+	if(tempo_player_livre()) _vel += TEMPO_VEL_EXTRA; //TEMPO PARADO: ANDA MAIS RAPIDO
 	var _velh = (_right - _left) * _vel;
 	if(no_gelo) _lerp = min(_lerp, GELO_ATRITO); //NO GELO ACELERA E FREIA DEVAGAR
 	velh = lerp(velh, _velh, _lerp)
@@ -103,6 +105,11 @@ mover = function(_vel, _lerp = .7)
 if(!variable_instance_exists(id, "jogador")) jogador = 1;
 imp = imputs_jogador(jogador);
 skin = jogador == 2 ? global.skin_player_2 : global.skin_player_1;
+//VERSUS: O FANTASMA DO PODER (NASCE NA ARENA DO ADVERSARIO COM O STRUCT { VS_FANTASMA : TRUE }), O CORPO PARADO E O AMASSADO
+if(!variable_instance_exists(id, "vs_fantasma")) vs_fantasma = false;
+vs_parado = false;		//O DONO USOU O PODER: O CORPO FICA PARADO E IMUNE ATE O FANTASMA SAIR
+amassado = 0;			//FRAMES QUE FALTAM PRA SE LEVANTAR (O FANTASMA DO ADVERSARIO PULOU EM CIMA)
+amasso_imune = 0;		//DEPOIS DE SE LEVANTAR, UM TEMPO SEM SER AMASSADO DE NOVO
 reviver = 0;	//COOP: FRAMES QUE FALTAM PRA VOLTAR DEPOIS DE MORRER
 
 //SONS: GUARDA O ULTIMO ESTADO PRA SABER QUANDO ENTROU EM UM NOVO
@@ -118,10 +125,26 @@ recarga_dash = 0;
 
 timer_morte = 0;	//TEMPO DESDE QUE MORREU (ANIMAÇAO DE MORTE)
 
+//QUALQUER DANO (ESMAGADO, TIRO, LASER, BOMBA, INIMIGO...): NO ARCADE E NO COOP O JOGADOR SO PERDE DANO_PONTOS PONTOS.
+//SE O PLACAR ESTA ZERADO (NADA PRA PERDER), ENTAO PERDE UM CORAÇAO. COM POUCOS PONTOS PERDE O QUE TEM
+//(O CORAÇAO SO VAI QUANDO NAO SOBRA NADA). O GAME OVER VEM DE ARENA CHEIA OU DE ACABAR OS CORAÇOES
+#macro DANO_PONTOS	800
+dano_cobrar = function()
+{
+	if(global.tutorial) exit; //NO TUTORIAL O DANO SO EMPURRA
+	if(modo_arcade() and !modo_versus() and global.pontos_1 > 0)
+	{
+		pontos_tirar(DANO_PONTOS, x, bbox_top - 14); //(NO MODO IMORTAL OS PONTOS TAMBEM CAEM: SO OS CORAÇOES FICAM PROTEGIDOS)
+		return;
+	}
+	if(IMORTAL) exit; //MODO DE TESTE: LEVA O DANO (EMPURRAO) MAS NAO PERDE CORAÇAO
+	vida_atual--;
+}
+
 //LEVAR DANO (LASER). DEPOIS FICA IMUNE UM TEMPO, PISCANDO
 levar_dano = function(_dir, _dano = ESCUDO_DANO)
 {
-	if(imune > 0 or estado == state.morte) exit;
+	if(imune > 0 or estado == state.morte or vs_fantasma or vs_parado) exit;
 	
 	//ESCUDO: SEGURA O ATAQUE E PERDE RESISTENCIA (ZEROU: QUEBRA ATE ENCHER DE NOVO)
 	if(tem_poder("escudo") and !escudo_quebrado)
@@ -146,8 +169,8 @@ levar_dano = function(_dir, _dano = ESCUDO_DANO)
 		exit;
 	}
 	
-	//SEM ESCUDO: PERDE UMA VIDA. ACABOU: MORRE
-	if(!IMORTAL) vida_atual--; //MODO DE TESTE: LEVA O DANO (EMPURRAO) MAS NAO PERDE VIDA
+	//SEM ESCUDO: PERDE PONTOS (OU UM CORAÇAO SE NAO TIVER PONTOS). SEM CORAÇOES: MORRE
+	dano_cobrar();
 	if(vida_atual <= 0)
 	{
 		morrer();
@@ -169,7 +192,7 @@ levar_dano = function(_dir, _dano = ESCUDO_DANO)
 //COOP: O PARCEIRO PISOU NA CABEÇA. SO O EFEITO DO DANO (EMPURRAO, PISCADA, TREMIDA): NAO PERDE VIDA E NAO FICA IMUNE
 efeito_dano = function(_dir)
 {
-	if(estado == state.morte) exit;
+	if(estado == state.morte or vs_fantasma) exit;
 	estado = state.dano;
 	timer_dano = 0;
 	velh = 2 * _dir;
@@ -181,9 +204,10 @@ efeito_dano = function(_dir)
 }
 
 //MORRER (ESMAGADO, SEM VIDA OU ARENA CHEIA). O OBJ_GAME_CONTROL MOSTRA O GAME OVER
-morrer = function()
+morrer = function(_forcar = false)
 {
-	if(estado == state.morte or IMORTAL) exit;
+	if(estado == state.morte or vs_fantasma or ((IMORTAL or global.tutorial) and !_forcar)) exit; //(NO TUTORIAL NINGUEM MORRE. _FORCAR: VERSUS, ARENA CHEIA)
+	if(room == rm_versus and global.vs_perdedor == 0) global.vs_perdedor = jogador; //VERSUS: QUEM MORRE PERDE
 	if(TESTE_AUTO) show_debug_message("[TESTE] player morreu: " + string(debug_get_callstack()));
 	
 	//ANIMAÇAO DE MORTE: ONDA DE CHOQUE GRANDE, PULO PRA CIMA E TREMIDA FORTE
@@ -198,35 +222,75 @@ morrer = function()
 	reviver = COOP_REVIVER; //COOP: VOLTA DEPOIS DE UM TEMPO (SE O PARCEIRO TIVER VIVO)
 }
 
+//AMASSADO: FICA ACHATADO NO CHAO E SEM CONTROLE POR UM TEMPO. VERSUS: O FANTASMA DO ADVERSARIO PULOU EM CIMA.
+//COOP: O PARCEIRO PULOU (OU CAIU GIRANDO) EM CIMA. _IMUNE_TOTAL = TEMPO (FRAMES) EM QUE FICA INVULNERAVEL (PRA NAO LEVAR OUTRO PISAO E
+//NEM DANO NA HORA), CONTADO DESDE O PISAO. 0 = SO A IMUNIDADE CURTA DE DEPOIS DE SE LEVANTAR
+amassar = function(_imune_total = 0)
+{
+	if(estado == state.morte or vs_fantasma or amassado > 0 or amasso_imune > 0) exit;
+	if(_imune_total > 0)
+	{
+		imune = max(imune, _imune_total);
+		imune_escudo = false;
+		amasso_imune = _imune_total;
+	}
+	amassado = global.coop ? VS_AMASSO * .5 : VS_AMASSO; //NO COOP O AMASSADO DURA METADE DO VERSUS
+	velh = 0;
+	estado = state.idle;
+	esc_x = 1.8 * sign(image_xscale);
+	esc_y = .3;
+	alpha_fog = 1;
+	poeira(x, y + 6, 10);
+	onda_choque(x, y, 70, 5, 24);
+	shakes(10, 3);
+	audio_play_sound(snd_hit2, 1, false, .8, 0, .7);
+	if(!global.coop) efeito_texto(global.linguagem == 0 ? "AMASSADO!" : "SQUASHED!", x, y - 28, #FF5577, 1.2); //NO COOP NAO MOSTRA O TEXTO
+}
+
 quique_seq = 0; //QUANTOS BLOCOS QUEBROU QUICANDO COM O GIRO NO AR SEM PISAR NO CHAO
 
-//GIRO DE FOGO: GIRAR GIRO_FOGO_SEGUIDOS VEZES SEGUIDAS (CADA GIRO COMEÇANDO ATE GIRO_FOGO_JANELA DEPOIS DO ANTERIOR)
+//GIRO DE FOGO: QUEBRAR GIRO_FOGO_SEGUIDOS BLOCOS COM O GIRO, SEGUIDOS (CADA QUEBRADA ATE GIRO_FOGO_JANELA DEPOIS DA ANTERIOR).
+//SO GIRAR NAO ACENDE O FOGO: TEM QUE QUEBRAR. OUTRO JEITO: GIRAR NO AR DEPOIS DE CAIR DE MUITO ALTO (GIRO_FOGO_ALTURA).
 //BOTA FOGO NO GIRO: EFEITO DE FOGO NO PERSONAGEM E CADA BLOCO QUEBRADO GIRANDO VALE GIRO_FOGO_PONTOS A MAIS.
-//PAROU DE GIRAR POR MAIS QUE A JANELA: O FOGO APAGA
+//PAROU DE QUEBRAR POR MAIS QUE A JANELA: O FOGO APAGA
 #macro GIRO_FOGO_SEGUIDOS	3
-#macro GIRO_FOGO_JANELA		(room_speed * 1.2)	//TEMPO MAXIMO ENTRE UM GIRO E OUTRO PRA CONTAR COMO SEGUIDO
+#macro GIRO_FOGO_JANELA		(room_speed * 1.2)	//TEMPO MAXIMO ENTRE UMA QUEBRADA E OUTRA PRA CONTAR COMO SEGUIDA
 #macro GIRO_FOGO_PONTOS		5					//PONTOS A MAIS POR BLOCO QUEBRADO NO GIRO DE FOGO
-giro_seq = 0;		//GIROS SEGUIDOS
-giro_janela = 0;	//FRAMES QUE AINDA DA PRA EMENDAR O PROXIMO GIRO (NAO CONTA ENQUANTO TA GIRANDO)
+#macro GIRO_FOGO_ALTURA		128					//CAIR DE PELO MENOS ISSO (PX) E GIRAR NO AR ACENDE O FOGO DIRETO (8 CASAS)
+giro_seq = 0;		//BLOCOS QUEBRADOS COM O GIRO, SEGUIDOS
+giro_janela = 0;	//FRAMES QUE AINDA DA PRA EMENDAR A PROXIMA QUEBRADA (NAO CONTA ENQUANTO TA GIRANDO)
+queda_dist = 0;		//QUANTO JA CAIU (PX) SEM TOCAR NO CHAO NEM SUBIR (PRA GIRO DE FOGO DE QUEDA ALTA)
 
 //TA COM O GIRO DE FOGO?
 em_fogo = function() { return giro_seq >= GIRO_FOGO_SEGUIDOS; }
 
-//COMEÇOU UM GIRO (CHAMADO NO END STEP QUANDO ENTRA NO ESTADO DE GIRO): CONTA OS SEGUIDOS
+//EFEITO DE ACABAR DE PEGAR FOGO
+giro_fogo_efeito = function()
+{
+	efeito_texto(global.linguagem == 0 ? "GIRO DE FOGO!" : "FIRE SPIN!", x, y - 32, c_orange, 1);
+	audio_play_sound(snd_Giro, 1, false, 1, 0, .7);
+	som_nota(7, .5);
+	som_nota(9, .4);
+	alpha_fog = 1;
+}
+
+//QUEBROU UM BLOCO COM O GIRO: CONTA OS SEGUIDOS (CHAMADO NO MOMENTO DA QUEBRA)
 giro_contar = function()
 {
 	if(giro_janela > 0) giro_seq++;
 	else giro_seq = 1;
 	giro_janela = GIRO_FOGO_JANELA;
 	//ACABOU DE PEGAR FOGO
-	if(giro_seq == GIRO_FOGO_SEGUIDOS)
-	{
-		efeito_texto(global.linguagem == 0 ? "GIRO DE FOGO!" : "FIRE SPIN!", x, y - 32, c_orange, 1);
-		audio_play_sound(snd_Giro, 1, false, 1, 0, .7);
-		som_nota(7, .5);
-		som_nota(9, .4);
-		alpha_fog = 1;
-	}
+	if(giro_seq == GIRO_FOGO_SEGUIDOS) giro_fogo_efeito();
+}
+
+//COMEÇOU UM GIRO NO AR DEPOIS DE UMA QUEDA ALTA: ACENDE O FOGO DIRETO
+giro_fogo_queda = function()
+{
+	var _ja = em_fogo();
+	giro_seq = max(giro_seq, GIRO_FOGO_SEGUIDOS);
+	giro_janela = GIRO_FOGO_JANELA;
+	if(!_ja) giro_fogo_efeito();
 }
 
 timer_dano = 0; //TEMPO NO ESTADO DE DANO (SEGURANÇA PRA NAO FICAR PRESO)
@@ -234,7 +298,7 @@ pisca_dano = 0; //COOP: PISCANDO DEPOIS DO PISAO DO PARCEIRO (SO VISUAL)
 
 
 //ESMAGADO POR UMA PEÇA CAINDO (PRENSADO CONTRA O CHAO OU OUTRO BLOCO):
-//PERDE UMA VIDA (SE NAO TIVER IMUNE) E E EXPULSO PRA CIMA DA PEÇA QUE ESMAGOU.
+//PERDE PONTOS (OU UM CORAÇAO SE NAO TIVER PONTOS, VER DANO_COBRAR) SE NAO TIVER IMUNE E E EXPULSO PRA CIMA DA PEÇA QUE ESMAGOU.
 //SE LA TIVER OCUPADO, VAI SUBINDO CASA POR CASA OU TENTA AS COLUNAS DO LADO. SO MORRE SE ERA A ULTIMA VIDA
 //(OU SE NAO TIVER NENHUM LUGAR LIVRE PRA ONDE IR)
 esmagado = function(_bloco)
@@ -243,7 +307,7 @@ esmagado = function(_bloco)
 	
 	if(imune <= 0)
 	{
-		if(!IMORTAL) vida_atual--; //MODO DE TESTE: MOSTRA O DANO (PISCA, FICA IMUNE) MAS NAO PERDE VIDA
+		dano_cobrar(); //PERDE PONTOS (OU UM CORAÇAO SE NAO TIVER PONTOS)
 		if(vida_atual <= 0)
 		{
 			morrer();
@@ -357,6 +421,22 @@ solido_linha = function(_x1, _y1, _x2, _y2)
 #macro SOCO_ALCANCE	2		//LARGURA DA HITBOX DO SOCO (1 = 4PX, O ORIGINAL). CRESCE SO PRA FRENTE
 #macro GIRO_QUIQUE_FORTE	1.35	//QUIQUE DO GIRO NO AR EM CIMA DE UMA PEÇA SEGURANDO O PULO (ERA 1.15)
 giro_baixo = false; //GIRO DO BAIXO + GIRO (QUEBRA SO O BLOCO DE BAIXO)
+
+//GIRO LATERAL (NO AR: SEGURA SHIFT + GIRO): O PLAYER SE JOGA GIRANDO PRO LADO ESCOLHIDO. NO FIM DA ANIMAÇAO VOLTA A CAIR.
+//SE BATER NUM BLOCO, QUEBRA ELE E VOLTA PRO PULO (DA PRA EMENDAR OUTRO GIRO LATERAL E IR QUEBRANDO OS BLOCOS DO LADO).
+//BATEU NA PAREDE/CHAO SOLIDO OU ACABOU SEM BATER: SO PODE GIRAR DE LADO DE NOVO DEPOIS DE PISAR NO CHAO
+giro_lat_vel = 3.8;	//VELOCIDADE PRO LADO DURANTE O GIRO LATERAL
+giro_lat_tempo = 8;	//FRAMES MAXIMOS DO GIRO LATERAL (VEL * TEMPO = DISTANCIA)
+giro_lat_pulo = 3.4;	//PULINHO QUE DA AO QUEBRAR UM BLOCO (VOLTA PRO PULO)
+giro_lat_recuo = 2.8;	//QUANTO VOLTA PRA TRAS AO QUEBRAR (PRA CONSEGUIR ENGATAR OUTRO GIRO NOS BLOCOS SEGUINTES)
+giro_lat_trava_tempo = (room_speed * .15);	//TEMPO SEM CONTROLE DO PLAYER DEPOIS DE QUEBRAR UM BLOCO COM O GIRO LATERAL
+giro_lat_hitstop = 5;	//FRAMES DE HITSTOP (O JOGO CONGELA UM INSTANTE) AO QUEBRAR UM BLOCO COM O GIRO LATERAL
+giro_lat_anim = 1.7;	//VELOCIDADE DA ANIMAÇAO DO GIRO LATERAL
+giro_lat = false;		//ESTOU NO GIRO LATERAL?
+giro_lat_livre = true;	//PODE COMEÇAR UM GIRO LATERAL AGORA? (VOLTA A TRUE AO PISAR NO CHAO OU AO QUEBRAR UM BLOCO)
+giro_lat_dir = 1;		//LADO DO GIRO LATERAL (-1 ESQUERDA, 1 DIREITA)
+giro_lat_t = 0;			//FRAMES QUE JA PASSARAM NO GIRO LATERAL
+giro_lat_trava = 0;		//FRAMES QUE AINDA FALTAM SEM CONTROLE (DEPOIS DE QUEBRAR UM BLOCO)
 chao_antes = true;	//GAMEFEEL: TAVA NO CHAO NO FRAME ANTERIOR (POEIRA NO PULO E NA ATERRISSAGEM)
 velv_antes = 0;	//VELOCIDADE VERTICAL NO FRAME ANTERIOR
 rastro_dash = [];	//GAMEFEEL: SOMBRAS DO DASH
@@ -365,6 +445,7 @@ rastro_dash = [];	//GAMEFEEL: SOMBRAS DO DASH
 pulo_duplo_usado = false;	//ASAS: JA USOU O SEGUNDO PULO NESSE AR
 dash_dx = 1;				//DASH: DIREÇAO (COM O PODER DO DASH PODE SER QUALQUER UMA DAS 8)
 dash_dy = 0;
+dash_ang = 0;				//DASH: ANGULO DA SPRITE (INCLINA PRA DIREÇAO DO DASH E VOLTA SUAVE QUANDO ACABA)
 reflexo_energia = 100;		//REFLEXO: CADA ESQUIVA GASTA REFLEXO_CUSTO
 escudo_vida = 100;			//ESCUDO: RESISTENCIA
 escudo_quebrado = false;	//QUEBROU: SO VOLTA QUANDO A BARRA ENCHER DE NOVO
