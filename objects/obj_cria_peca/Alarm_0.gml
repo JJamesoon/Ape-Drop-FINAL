@@ -8,6 +8,19 @@ if(global.prox_especie == "inimigo" or global.prox_especie == "bomba" or global.
 else
 {
 	var _pai = criar_pecas(global.prox_tipo, global.prox_cor, global.prox_fantasmas);
+	if(_pai == noone)
+	{
+		//NAO CABEU (CASA OCUPADA): SORTEIA OUTRA PEÇA E TENTA DE NOVO NO PROXIMO FRAME, SEM EFEITO NENHUM
+		tentativas++;
+		if(tentativas > 60) instance_destroy();
+		else
+		{
+			if(global.debug_bloco == "") peca_sortear_proxima();
+			alarm[0] = 1;
+			exit;
+		}
+		exit;
+	}
 	if(global.prox_gelo) peca_colocar_gelo(_pai.meus_filhos);	//A PEÇA INTEIRA DE GELO
 	if(global.prox_gelo and global.frio > 0) for(var k = 0; k < array_length(_pai.meus_filhos); k++) if(instance_exists(_pai.meus_filhos[k])) _pai.meus_filhos[k].gelo_frio = true;	//NASCEU NO FRIO: DERRETE DEPOIS
 	if(global.prox_especie == "gelatina" or global.prox_especie == "buraco") bloco_virar_sozinho(_pai, global.prox_especie);

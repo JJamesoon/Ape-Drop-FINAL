@@ -22,13 +22,37 @@ if(timer == 1)
 	with(obj_area) alarm[0] = 99999;
 	with(obj_game_control) { onda_proxima = 99999; letra_timer = 99999; laser_proxima = 99999; }
 	player_longe();
-	etapa = "descobrir";
+	etapa = "cabe";
 	marca = timer;
 }
 global.tempo_partida = 30; //SEM DESAFIO NO MEIO DO TESTE
 
 switch(etapa)
 {
+	#region PECA QUE NAO CABE NAO NASCE (SO NASCE QUANDO A CASA LIBERA)
+	case "cabe":
+		if(_t == 2) { _limpar(); _player(-200, 100); }
+		if(_t == 5)
+		{
+			var _a = obj_area;
+			global.prox_tipo = tipo_peca.O; global.prox_especie = "normal"; global.prox_fantasmas = 0; global.prox_gelo = false; global.prox_cor = cores.c_green;
+			peca_t = criar_bloco_solto(_a.x + 8 + 16 * 4, _a.y - 24, cores.c_green);
+			instance_create_layer(_a.x + 8 + 16 * 4, _a.y - 24, "Linha", obj_cria_peca);
+		}
+		if(_t == 30) { var _tent = instance_exists(obj_cria_peca) ? obj_cria_peca.tentativas : -1; log("bloco no lugar: criadores=" + string(instance_number(obj_cria_peca)) + " tentativas=" + string(_tent) + " pecas O nascidas=" + string(instance_number(obj_peca) - 1)); }
+		if(_t == 31) { instance_destroy(peca_t); log("bloco tirado"); }
+		if(_t == 60)
+		{
+			var _pos = [], _dup = 0;
+			with(obj_peca) array_push(_pos, string(x) + "_" + string(y));
+			for(var i = 0; i < array_length(_pos); i++) for(var j = i + 1; j < array_length(_pos); j++) if(_pos[i] == _pos[j]) _dup++;
+			log("depois: criadores=" + string(instance_number(obj_cria_peca)) + " pecas=" + string(instance_number(obj_peca)) + " casas com dois blocos=" + string(_dup) + " (esperado 0)");
+			screen_save("teste_z1_cabe.png");
+		}
+		if(_t == 70) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region PODER DE PARAR O TEMPO E PEÇAS DUPLAS
 	//TEMPO PARADO: A GELATINA NAO QUICA O PLAYER, E NA CONTAGEM ELE AINDA ANDA
 	//BLOCO NOVO DESCOBERTO E LASER LATERAL

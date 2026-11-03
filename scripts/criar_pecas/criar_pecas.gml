@@ -120,7 +120,18 @@ function area_mais_perto(_x, _y)
 	return _melhor;
 }
 
-//CRIA A PEÇA NA POSIÇAO DO CRIADOR (CHAMADO PELO OBJ_CRIA_PECA, QUE SE DESTROI DEPOIS)
+//TODAS AS CASAS DA PEÇA (PAI E FILHOS) ESTAO LIVRES NA GRADE? (SEM BLOCO, PEÇA, PAREDE OU CHAO OCUPANDO)
+function peca_cabe(_x, _y, _ox, _oy)
+{
+	if(grid_celula_ocupada(_x, _y, noone)) return false;
+	for(var i = 0; i < array_length(_ox); i++)
+	{
+		if(grid_celula_ocupada(_x + _ox[i] * CEL, _y + _oy[i] * CEL, noone)) return false;
+	}
+	return true;
+}
+
+//CRIA A PEÇA NA POSIÇAO DO CRIADOR (CHAMADO PELO OBJ_CRIA_PECA, QUE SE DESTROI DEPOIS). DEVOLVE NOONE SE A PEÇA NAO CABE
 //_FANTASMAS = QUANTOS BLOCOS DA PEÇA SAO FANTASMA (O PLAYER PASSA POR DENTRO, SO O GIRO QUEBRA)
 function criar_pecas(_tipo, _cor, _fantasmas = 0)
 {
@@ -148,6 +159,10 @@ function criar_pecas(_tipo, _cor, _fantasmas = 0)
 		if(_col + _min < 0)				x += CEL * -(_col + _min);
 		if(_col + _max > _area.cols - 1)	x -= CEL * (_col + _max - (_area.cols - 1));
 	}
+
+	//A PEÇA SO NASCE SE CABER: NENHUMA CASA DELA PODE ESTAR OCUPADA (SENAO UM BLOCO FICAVA DENTRO DO OUTRO).
+	//SE NAO CABE, NAO CRIA NADA: QUEM CHAMOU (OBJ_CRIA_PECA) SORTEIA OUTRA E TENTA DE NOVO
+	if(!peca_cabe(x, y, _ox, _oy)) return noone;
 
 	//CRIA O BLOCO PAI
 	var _pai = instance_create_layer(x, y, "Blocos", obj_peca);

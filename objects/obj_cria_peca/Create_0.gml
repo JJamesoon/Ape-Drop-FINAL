@@ -3,3 +3,4 @@ tipo = noone;
 
 //CRIANDO PEÇA
 alarm[0] = 1;
+tentativas = 0;	//QUANTAS VEZES A PEÇA SORTEADA NAO CABEU NA GRADE (VER PECA_CABE)
