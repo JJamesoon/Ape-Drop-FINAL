@@ -400,7 +400,9 @@ ajustando_posicao = function()
 	{
 		// SNAP: FORÇA O Y PRO GRID ANTES DE CALCULAR O PRÓXIMO
 		//(A RAIVOSA NAO: ELA NAO PARA ENTRE AS CASAS E O SNAP PUXARIA ELA PRA TRAS. ELA ENCAIXA QUANDO BATE)
-		var _y = ((_irmaos[i].y div CEL) * CEL) + 8;
+		//FLOOR E NAO DIV: O DIV ARREDONDA PRO ZERO, ENTAO UM BLOCO ACIMA DA TELA (Y NEGATIVO, TIPO -8) IA PRA Y = 8,
+		//UMA CASA ABAIXO, DENTRO DO IRMAO DE BAIXO. NO COOP A ARENA COMEÇA EM Y = 32 E A J/I EM PE NASCIA ASSIM
+		var _y = (floor(_irmaos[i].y / CEL) * CEL) + 8;
 		if(!sou_raivoso) _irmaos[i].y = _y;
 		
 		var _mult = sou_raivoso == true ? 2 : 1;

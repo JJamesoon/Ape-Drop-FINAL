@@ -22,13 +22,98 @@ if(timer == 1)
 	with(obj_area) alarm[0] = 99999;
 	with(obj_game_control) { onda_proxima = 99999; letra_timer = 99999; laser_proxima = 99999; }
 	player_longe();
-	etapa = "cabe";
+	etapa = "jcoop";
 	marca = timer;
 }
 global.tempo_partida = 30; //SEM DESAFIO NO MEIO DO TESTE
 
 switch(etapa)
 {
+	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
+	case "jcoop":
+		if(_t == 2)
+		{
+			if(room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+			_limpar(); _player(-200, 100);
+		}
+		if(_t == 5 or _t == 6 or _t == 7)
+		{
+			//UMA PEÇA POR FRAME (O CRIADOR LE AS GLOBAIS PROX_* QUANDO NASCE A PEÇA)
+			var _tipos = [tipo_peca.J3, tipo_peca.J1, tipo_peca.I1];
+			var _cols = [1, 7, 13];
+			var _k = _t - 5;
+			global.prox_tipo = _tipos[_k]; global.prox_especie = "normal"; global.prox_fantasmas = 0; global.prox_gelo = false; global.prox_cor = cores.c_red;
+			var _c = instance_create_layer(obj_area.x + 8 + 16 * _cols[_k], obj_area.y + 8 - 32, "Linha", obj_cria_peca);
+			with(_c) event_perform(ev_alarm, 0);
+		}
+		if(_t == 90 or _t == 400)
+		{
+			var _pos = [], _dup = 0;
+			with(obj_peca) array_push(_pos, string(x) + "_" + string(y));
+			for(var i = 0; i < array_length(_pos); i++) for(var j = i + 1; j < array_length(_pos); j++) if(_pos[i] == _pos[j]) _dup++;
+			log("t=" + string(_t) + " arena y=" + string(obj_area.y) + " blocos=" + string(instance_number(obj_peca)) + " (esperado 12) casas com dois blocos=" + string(_dup) + " (esperado 0) " + string(_pos));
+			if(_t == 400) screen_save("teste_jcoop.png");
+		}
+		if(_t == 405) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
+	#region COOP: PROCURA DOIS BLOCOS NA MESMA CASA (JOGO NORMAL + SOCOS E TELEPORTES ALEATORIOS)
+	case "sobrepor":
+		if(_t == 2)
+		{
+			if(room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+			randomize();
+			game_set_speed(600, gamespeed_fps);
+			with(obj_area) alarm[0] = 1;
+			with(obj_game_control) onda_proxima = 300;
+			viradas = 0;
+			pais_vistos = {};
+		}
+		if(_t == 3) log("room=" + room_get_name(room) + " coop=" + string(global.coop) + " players=" + string(instance_number(obj_player)) + " cols=" + string(obj_area.cols));
+		if(_t > 2 and _t mod 2000 == 0) screen_save("teste_sobrepor_" + string(_t) + ".png");
+		if(_t > 2)
+		{
+			global.tempo_partida = 30 + _t / 60;
+			//PEÇA NOVA (30 FRAMES DE VIDA) TEM QUE TER 4 BLOCOS EM 4 CASAS DIFERENTES
+			with(obj_peca) if(sou_pai and tipo != tipo_peca.F)
+			{
+				var _k = string(id);
+				if(!variable_struct_exists(other.pais_vistos, _k)) other.pais_vistos[$ _k] = _t;
+				else if(_t - other.pais_vistos[$ _k] == 30)
+				{
+					var _casas = [], _meu = id;
+					with(obj_peca) if(pai == _meu and destruido_por == noone) { var _c = string(round(x)) + "_" + string(round(y)); if(!array_contains(_casas, _c)) array_push(_casas, _c); }
+					if(array_length(_casas) != 4) { other.log("PECA NOVA COM " + string(array_length(_casas)) + " CASAS t=" + string(_t) + " tipo=" + string(tipo) + " x=" + string(x) + " y=" + string(y) + " casas=" + string(_casas)); other.viradas++; }
+				}
+			}
+			//SOCO ALEATORIO NUMA PEÇA (NORMAL OU SUPER) E TELEPORTE ALEATORIO
+			if(_t mod 7 == 0 and instance_number(obj_peca) > 0) with(instance_find(obj_peca, irandom(instance_number(obj_peca) - 1))) velocidade_h(choose(-1, 1), choose(true, false));
+			if(_t mod 97 == 0 and instance_number(obj_peca) > 0) with(instance_find(obj_peca, irandom(instance_number(obj_peca) - 1))) if(sou_pai and !estou_parado) teleportar_peca();
+			//DOIS BLOCOS VIVOS COM O CENTRO A MENOS DE 8PX UM DO OUTRO
+			var _n = instance_number(obj_peca);
+			for(var i = 0; i < _n and viradas < 15; i++)
+			{
+				var _a = instance_find(obj_peca, i);
+				if(_a.destruido_por != noone) continue;
+				for(var j = i + 1; j < _n; j++)
+				{
+					var _b = instance_find(obj_peca, j);
+					if(_b.destruido_por != noone) continue;
+					if(abs(_a.x - _b.x) < 8 and abs(_a.y - _b.y) < 8)
+					{
+						viradas++;
+						var _txt = function(_p) { return "id=" + string(_p.id) + " pai=" + string(_p.pai) + " sou_pai=" + string(_p.sou_pai) + " tipo=" + string(instance_exists(_p.pai) ? _p.pai.tipo : -1) + " x=" + string(_p.x) + " y=" + string(_p.y) + " prox_x=" + string(_p.prox_x) + " andar=" + string(_p.andar) + " parado=" + string(_p.estou_parado) + " irm=" + string(_p.irmandade) + " raiv=" + string(_p.sou_raivoso) + " fujao=" + string(_p.sou_fujao) + " gel=" + string(_p.gel_quicando) + " init=" + string(_p.inicializando); };
+						log("SOBREPOSTO t=" + string(_t) + " | A " + _txt(_a) + " | B " + _txt(_b));
+						if(viradas == 1) screen_save("teste_sobrepor.png");
+					}
+				}
+			}
+		}
+		if(_t == 12000) { log("fim: sobrepostos=" + string(viradas) + " pecas=" + string(instance_number(obj_peca))); log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region PECA QUE NAO CABE NAO NASCE (SO NASCE QUANDO A CASA LIBERA)
 	case "cabe":
 		if(_t == 2) { _limpar(); _player(-200, 100); }
