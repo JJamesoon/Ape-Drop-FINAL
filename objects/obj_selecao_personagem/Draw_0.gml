@@ -50,7 +50,7 @@ if(global.coop)
 {
 	_titulo = "PLAYER " + string(jogador_escolhendo) + ": " + _titulo;
 	_cor_t = jogador_escolhendo == 2 ? COOP_COR_P2 : COOP_COR_P1;
-	var _teclas = _pt ? "P1: WASD + J K L M      P2: SETAS + C X Z V      ESPAÇO: TELEPORTE" : "P1: WASD + J K L M      P2: ARROWS + C X Z V      SPACE: TELEPORT";
+	var _teclas = _pt ? "P1: WASD + J K L M      P2: SETAS + NUM 1 2 3      TELEPORTE: ESPAÇO / NUM 0 (UM DE CADA VEZ)" : "P1: WASD + J K L M      P2: ARROWS + NUM 1 2 3      DROP: SPACE / NUM 0 (TAKE TURNS)";
 	draw_text_transformed_color(_centro_x, 58 + _ty, _teclas, .6, .6, 0, #C7CFDD, #C7CFDD, #C7CFDD, #C7CFDD, 1);
 }
 var _tw = string_width(_titulo) / 2 + 18;

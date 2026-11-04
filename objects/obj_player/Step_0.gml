@@ -150,7 +150,7 @@ _jump_giro_press= keyboard_check(imp.giro_press);
 _dash			= keyboard_check_pressed(imp.dash);
 
 //RECUO DO GIRO LATERAL: POR UM TEMPINHO O PLAYER NAO RESPONDE AOS COMANDOS (SO DESLIZA PRA TRAS, FREANDO)
-if(giro_lat_trava > 0 or global.zorg_trava or vs_parado or amassado > 0)
+if(giro_lat_trava > 0 or vs_parado or amassado > 0)
 {
 	if(giro_lat_trava > 0) giro_lat_trava--;
 	_left = false; _right = false; _down = false;

@@ -464,7 +464,6 @@ function dificuldade_fator_inicio()
 function velocidade_aviso()
 {
 	global.vel_aviso = 1;
-	zorg_falar("rapido");
 	som_tocar(snd_menu_erro_03);
 	shakes(4, 1);
 	if(instance_exists(obj_area))
@@ -742,7 +741,6 @@ function onda_iniciar()
 	//TUDO SO CAI 2X MAIS RAPIDO DEPOIS DA CONTAGEM (AS PEÇAS DA ONDA TAMBEM SO COMEÇAM DEPOIS DELA)
 	contagem_iniciar(texto("onda"), function() { global.onda_timer = ONDA_RAPIDA; });
 	shakes(8, 2);
-	zorg_falar("onda");
 }
 
 //CONTAGEM DE 3S ANTES DE O JOGO FICAR MAIS RAPIDO (ONDA, FEBRE, 2O ANDAR, LEVEL)================

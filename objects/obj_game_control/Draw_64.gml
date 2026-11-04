@@ -77,7 +77,7 @@ if(array_length(global.avisos_bloco) > 0 and instance_exists(obj_area))
 	var _e = gui_esc();
 	var _t = global.aviso_bloco_t;
 	var _desce = min(1, _t / 12) * min(1, (AVISO_BLOCO_DUR - _t) / 12);	//ENTRA E SAI DESLIZANDO
-	var _f = .85;	//AVISO UM POUCO MENOR (NAO FICA POR BAIXO DO PAINEL DO ZORG, QUE ENTRA PELO MESMO LADO)
+	var _f = .85;	//AVISO UM POUCO MENOR
 	var _w = 74 * _e * _f, _h = 26 * _e * _f;
 	var _ent = 1 - power(1 - max(0, _desce), 3);
 	//NO PC: NA AREA LIVRE DA ESQUERDA DA ARENA, ENTRANDO PELA ESQUERDA (ABAIXO DO PAINEL DO P2 NO COOP, ACIMA DO COMBO).
@@ -87,7 +87,7 @@ if(array_length(global.avisos_bloco) > 0 and instance_exists(obj_area))
 	{
 		var _cx_fim = (obj_area.x - 24) * _e - _w;
 		_cx = lerp(-_w * 1.2, _cx_fim, _ent);
-		_y1 = (obj_area.y + 262) * _e;	//BEM EMBAIXO (O ZORG USA O ALTO DA ESQUERDA, E O COMBO FICA NO MEIO)
+		_y1 = (obj_area.y + 262) * _e;	//BEM EMBAIXO (O COMBO FICA NO MEIO)
 	}
 	else
 	{
@@ -391,8 +391,8 @@ guia_linha_desenhar();
 //TIRA DE COMANDOS NO RODAPE (SCR_PODERES): AS TECLAS PASSAM DEVAGAR, CLARAS ATE O JOGADOR USAR, DEPOIS FICAM COM ALPHA .5
 teclas_desenhar();
 
-//ZORG (SCR_PODERES): NO JOGO NORMAL DESENHA AQUI (DEPOIS A TELA DE PAUSA/RESULTADO SAI CEDO). COM PAUSA/RESULTADO ELE DESENHA NO FIM, POR CIMA
-if(alpha_pause < .01 and alpha_fim < .01) zorg_desenhar();
+//COOP: ETIQUETA DE QUEM TEM A VEZ DO TELEPORTE EM CIMA DA PEÇA ATUAL (SCR_COOP)
+coop_vez_desenhar();
 
 //TELA DE PAUSA E DE RESULTADO (GAME OVER)
 //TUDO E POSICIONADO EM "PIXELS DA ROOM" E MULTIPLICADO POR _E, PORQUE A GUI E MAIOR QUE A ROOM
@@ -407,6 +407,13 @@ var _e = gui_esc();
 var _fim = alpha_fim > alpha_pause;
 var _a = max(alpha_pause, alpha_fim);
 var _cx = gui_meio_x();
+
+//PC: A PAUSA TEM O VISUAL DO MENU PRINCIPAL (SCR_MENU). O CELULAR E O GAME OVER USAM O PAINEL ANTIGO, AQUI EMBAIXO
+if(!_fim and !MOBILE)
+{
+	pausa_menu_desenhar(_a, pause_t, pause_sel, opcao_pause);
+	exit;
+}
 
 //FUNDO ESCURO
 draw_set_alpha(_a * .75);
@@ -547,9 +554,6 @@ else
 	if(!ver_comandos) draw_text_ext_transformed_color(_cx * _e, (_y + 6) * _e, texto("dica_especial"), 12, _pw - 30, _e * .7, _e * .7, 0, c_aqua, c_aqua, c_aqua, c_aqua, _a);
 	#endregion
 }
-
-//ZORG: A FRASE MALVADA NO TOPO (SCR_PODERES). POR CIMA DE TUDO, ATE DA TELA DE RESULTADO
-zorg_desenhar();
 
 //VOLTA O PADRAO DE DESENHO
 draw_set_alpha(1);

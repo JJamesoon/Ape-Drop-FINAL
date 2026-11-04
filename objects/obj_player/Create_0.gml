@@ -83,7 +83,7 @@ enum state
 //ANDA PRO LADO DAS TECLAS (_LERP = QUAO RAPIDO CHEGA NA VELOCIDADE)
 mover = function(_vel, _lerp = .7)
 {
-	if(giro_lat_trava > 0 or global.zorg_trava or vs_parado or amassado > 0) exit; //SEM CONTROLE (RECUO DO GIRO LATERAL): NAO ANDA PELAS TECLAS
+	if(giro_lat_trava > 0 or vs_parado or amassado > 0) exit; //SEM CONTROLE (RECUO DO GIRO LATERAL): NAO ANDA PELAS TECLAS
 	
 	var _left, _right;
 	

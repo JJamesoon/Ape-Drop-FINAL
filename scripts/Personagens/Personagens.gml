@@ -129,29 +129,3 @@ global.skins[personagem.dino] = skin_criar("Dino", [
 //PERSONAGEM ESCOLHIDO POR CADA JOGADOR (O SAVE PODE TROCAR ISSO)
 global.skin_player_1 = personagem.macaco;
 global.skin_player_2 = personagem.macaco;
-
-
-//==================== O NOME DO PERSONAGEM ESCOLHIDO NAS FALAS (ZORG) ====================
-//O TEXTO DIZ "{N}" NO LUGAR DE "MACACO" E O JOGO TROCA PELO QUE FOI ESCOLHIDO (PLAYER 1). O ARTIGO ACOMPANHA O GENERO:
-//{N} = NOME (MACACO, MOCHILEIRO, PÁSSARO ÁGUIA, LAGARTIXA), {O} = O/A, {NO} = NO/NA, {UM} = UM/UMA
-function heroi_nome()
-{
-	switch(global.skin_player_1)
-	{
-		case personagem.tartaruga:	return { n : "MOCHILEIRO",		fem : false };
-		case personagem.falcao:		return { n : "PÁSSARO ÁGUIA",	fem : false };
-		case personagem.dino:		return { n : "LAGARTIXA",		fem : true };
-	}
-	return { n : "MACACO", fem : false };
-}
-
-function heroi_texto(_txt)
-{
-	if(string_pos("{", _txt) == 0) return _txt;
-	var _h = heroi_nome();
-	_txt = string_replace_all(_txt, "{NO}", _h.fem ? "NA" : "NO");
-	_txt = string_replace_all(_txt, "{UM}", _h.fem ? "UMA" : "UM");
-	_txt = string_replace_all(_txt, "{O}", _h.fem ? "A" : "O");
-	_txt = string_replace_all(_txt, "{N}", _h.n);
-	return _txt;
-}

@@ -564,7 +564,7 @@ function frio_iniciar_partida()
 function frio_livre()
 {
 	if(global.frio_ativo or global.contagem > 0 or global.andar_pausa > 0 or global.onda_timer > 0) return false;
-	if(!is_undefined(global.zq) or zorg_segurando() or desafio_ativo() or instance_exists(obj_onda_laser)) return false;
+	if(desafio_ativo() or instance_exists(obj_onda_laser)) return false;
 	if(instance_exists(obj_game_control) and obj_game_control.onda_restantes > 0) return false;
 	return true;
 }
@@ -575,7 +575,6 @@ function frio_anunciar()
 	global.frio_espera = FRIO_INTERVALO;
 	global.frio_ativo = true;
 	contagem_iniciar(global.linguagem == 0 ? "ESTÁ FICANDO MUITO FRIO" : "IT'S GETTING VERY COLD", function() { frio_comecar(); });
-	zorg_falar("frio");
 	audio_play_sound(snd_feitico, 1, false, .7, 0, 1.7);
 	shakes(4, 1);
 }

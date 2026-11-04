@@ -271,7 +271,6 @@ limpar_linhas = function(_linhas)
 {
 	habil_aprender("linha"); //ENSINO NATURAL: JA SABE FECHAR LINHA
 	var _n = array_length(_linhas);
-	if(_n >= 3) zorg_falar("combo"); //ZORG: FECHOU 3 LINHAS OU MAIS DE UMA VEZ
 	var _regua = instance_exists(obj_linha) ? instance_nearest(x + sprite_width/2, y, obj_linha) : noone;
 	var _regua_y = _regua != noone ? floor(_regua.y) : infinity;
 	

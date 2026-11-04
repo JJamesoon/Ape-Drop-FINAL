@@ -30,7 +30,9 @@ recorde_inicio = recorde_atual(); //PRA SABER SE BATEU O RECORDE NESSA PARTIDA
 alpha_pause = 0;
 
 //MENUS
-opcao_pause = 0;	//0 CONTINUAR, 1 REINICIAR, 2 MENU
+opcao_pause = 0;	//INDICE NA LISTA DA PAUSA (PAUSA_IDS, SCR_MENU)
+pause_t = 0;		//FRAMES DESDE QUE PAUSOU (ANIMA A ENTRADA DA PAUSA)
+pause_sel = array_create(6, 0);	//ANIMAÇAO DA OPÇAO ESCOLHIDA DA PAUSA (0 A 1)
 opcao_fim = 0;		//0 JOGAR DE NOVO, 1 MENU
 frase_fim = 0;		//FRASE MOTIVACIONAL SORTEADA NO FIM
 timer_menu_fim = 0;
@@ -136,8 +138,8 @@ voltar_menu = function()
 if(modo_arcade()) habil_zerar();
 min_aviso = floor(global.tempo_partida / 60);	//ULTIMO MINUTO DE PARTIDA QUE JA AVISOU "PEÇAS MAIS RAPIDAS"
 
-//ZORG, O ALIEN QUE CONTROLA A GRADE (SCR_PODERES): ZERA O ESTADO DELE NA PARTIDA
-zorg_iniciar();
+//COOP: A VEZ DO TELEPORTE COMEÇA NO PLAYER 1
+coop_vez_reiniciar();
 
 //AS 5 PRIMEIRAS PEÇAS DO ARCADE SAO SEMPRE AS MESMAS (CRIAR_PECAS)
 abertura_iniciar();

@@ -69,7 +69,6 @@ function qc_iniciar()
 {
 	if(!desafio_pode()) return false;
 	instance_create_depth(0, 0, -1600, obj_quebra_cabeca);
-	zorg_falar("minigame");
 	return true;
 }
 
@@ -78,7 +77,6 @@ function enc_iniciar()
 {
 	if(!desafio_pode()) return false;
 	instance_create_depth(0, 0, -1600, obj_encaixe);
-	zorg_falar("minigame");
 	return true;
 }
 

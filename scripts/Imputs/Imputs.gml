@@ -3,8 +3,8 @@
 global.layouts_imputs = [
 	//01 - J, K, W, L, ESPAÇO, A, D, S, M
 	[ord("J"), ord("K"), ord("W"), ord("L"), vk_space, ord("A"), ord("D"), ord("S"), ord("M")],
-	//02 - C, X, CIMA, Z, ESPAÇO, SETAS, V
-	[ord("C"), ord("X"), vk_up, ord("Z"), vk_space, vk_left, vk_right, vk_down, ord("V")],
+	//02 (PLAYER 2 PADRAO) - SETAS PRA ANDAR/PULAR, NUMERICO 1 SOCO, 2 SOCO FORTE, 3 GIRO, 0 TELEPORTE, 4 DASH
+	[vk_numpad1, vk_numpad2, vk_up, vk_numpad3, vk_numpad0, vk_left, vk_right, vk_down, vk_numpad4],
 	//03 - D, S, I, A, SHIFT, J, L, K, F
 	[ord("D"), ord("S"), ord("I"), ord("A"), vk_shift, ord("J"), ord("L"), ord("K"), ord("F")],
 ];
@@ -39,7 +39,7 @@ function imputs_layout(_layout)
 //CARREGA O LAYOUT PADRAO
 trocar_comandos(global.meus_imputs);
 
-//COOP: CADA JOGADOR TEM UM LAYOUT FIXO NO MESMO TECLADO (P1 = 01: WASD + J K L M, P2 = 02: SETAS + C X Z V).
+//COOP: CADA JOGADOR TEM UM LAYOUT FIXO NO MESMO TECLADO (P1 = 01: WASD + J K L M, P2 = 02: SETAS + NUMERICO 1 2 3 0 4).
 //FORA DO COOP O PLAYER USA O LAYOUT ESCOLHIDO NAS CONFIGURAÇOES
 #macro COOP_LAYOUT_P1	0
 #macro COOP_LAYOUT_P2	1
@@ -47,10 +47,8 @@ function imputs_jogador(_n)
 {
 	if(room == rm_versus)
 	{
-		//VERSUS: P1 = LAYOUT 01, P2 = LAYOUT 02. OS DOIS TEM SUA FILA DE TELEPORTE, ENTAO O DO P2 NAO PODE SER O ESPAÇO: VAI NO V
-		var _l = imputs_layout(_n == 2 ? COOP_LAYOUT_P2 : COOP_LAYOUT_P1);
-		if(_n == 2) _l.acelerar = ord("V");
-		return _l;
+		//VERSUS: P1 = LAYOUT 01, P2 = LAYOUT 02. OS DOIS TEM SUA FILA DE TELEPORTE (ESPAÇO E NUMERICO 0, NAO BATEM)
+		return imputs_layout(_n == 2 ? COOP_LAYOUT_P2 : COOP_LAYOUT_P1);
 	}
 	if(!global.coop) return global.imputs;
 	return imputs_layout(_n == 2 ? COOP_LAYOUT_P2 : COOP_LAYOUT_P1);
@@ -69,6 +67,8 @@ function tecla_nome(_tecla)
 		case vk_left:	return global.linguagem == 0 ? "ESQ" : "LEFT";
 		case vk_right:	return global.linguagem == 0 ? "DIR" : "RIGHT";
 	}
+	//TECLADO NUMERICO (O CHR DARIA LETRA ERRADA)
+	if(_tecla >= vk_numpad0 and _tecla <= vk_numpad9) return "NUM " + string(_tecla - vk_numpad0);
 	return chr(_tecla);
 }
 

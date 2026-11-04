@@ -48,7 +48,6 @@ elevar_nivel = function()
 			//COMPLETOU O 3O ANDAR: SOBE DE LEVEL (MAIS PONTOS E PEÇAS MAIS RAPIDAS)
 			global.andar = 1;
 			global.level++;
-			zorg_falar("level");
 			//SO MUDA DE DEGRAU DE DIFICULDADE A CADA 3 LEVEIS (SCR_PONTOS, DIF_NIVEIS): AI AVISA "MAIS RAPIDO". NOS OUTROS LEVEIS NADA MUDA
 			if(dificuldade_degrau(global.level) > dificuldade_degrau(global.nivel_vel)) contagem_iniciar(global.linguagem == 0 ? "MAIS RÁPIDO" : "FASTER", function() { global.nivel_vel = global.level; });
 			else global.nivel_vel = global.level;

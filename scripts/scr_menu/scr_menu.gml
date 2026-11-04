@@ -309,6 +309,8 @@ function menu_painel_esq()
 {
 	var _sombra = #0E071B;
 	var _h = room_height;
+	//O ANGULO DA LOGO VEM DO OBJ_MENU_PRINCIPAL. FORA DELE (PAUSA DO JOGO) BALANÇA SOZINHA, IGUAL
+	var _ang = variable_instance_exists(id, "angle_title") ? angle_title : sin(current_time / 600) * 1.8;
 	draw_set_color(_sombra);
 	draw_set_alpha(.84);
 	draw_triangle(0, 0, MENU_PAINEL_X, 0, MENU_PAINEL_X - 36, _h, false);
@@ -319,8 +321,8 @@ function menu_painel_esq()
 	draw_set_alpha(1);
 	//LOGO (BALANÇA DE LEVE)
 	var _ls = 196 / sprite_get_width(spr_bg_ape);
-	draw_sprite_ext(spr_bg_ape, 0, 128 + 1, 52 + 1, _ls, _ls, angle_title * .6, _sombra, 1);
-	draw_sprite_ext(spr_bg_ape, 0, 128, 52, _ls, _ls, angle_title * .6, c_white, 1);
+	draw_sprite_ext(spr_bg_ape, 0, 128 + 1, 52 + 1, _ls, _ls, _ang * .6, _sombra, 1);
+	draw_sprite_ext(spr_bg_ape, 0, 128, 52, _ls, _ls, _ang * .6, c_white, 1);
 }
 
 //A CAIXA DO CARTAO DA DIREITA (FUNDO, BORDA E FAIXA DO TITULO). _Y1 = TOPO, _H = ALTURA, _SLIDE = DESLOCAMENTO DO TEXTO NA TROCA
@@ -391,20 +393,8 @@ function menu_novo_draw()
 		{
 			var _tx = MENU_PAINEL_X - 62;
 			draw_set_halign(fa_right);
-			if(_novo)
-			{
-				var _w = string_width(_tag) * .8 + 8;
-				draw_set_alpha(_a * ((current_time div 350) mod 2 == 0 ? 1 : .55));
-				draw_set_color(#E5173A);
-				draw_rectangle(_tx - _w + 4, _y - 7, _tx + 4, _y + 8, false);
-				draw_set_alpha(1);
-				draw_text_transformed_color(_tx, _y + 1, _tag, .8, .8, 0, c_white, c_white, c_white, c_white, _a);
-			}
-			else
-			{
-				var _ct = merge_color(#92A1B9, #1B1038, _s);
-				draw_text_transformed_color(_tx, _y + 1, _tag, .8, .8, 0, _ct, _ct, _ct, _ct, _a);
-			}
+			var _ct = merge_color(#92A1B9, #1B1038, _s);
+			draw_text_transformed_color(_tx, _y + 1, _tag, .8, .8, 0, _ct, _ct, _ct, _ct, _a);
 			draw_set_halign(fa_left);
 		}
 	}
@@ -746,4 +736,173 @@ function menu_conf_draw()
 	draw_set_color(c_white);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
+}
+
+//==================== PAUSA NO ESTILO DO MENU PRINCIPAL (SO NO PC) ====================
+//A LISTA FICA NA ESQUERDA, NO MESMO PAINEL ESCURO COM A LOGO, E NA DIREITA UM CARTAO COM TODOS OS COMANDOS (NO COOP E NO VERSUS, AS TECLAS
+//DOS DOIS JOGADORES). NO CELULAR A PAUSA CONTINUA NO PAINEL ANTIGO (OBJ_GAME_CONTROL, DRAW GUI). A TELA DE GAME OVER TAMBEM
+
+//OPÇOES DA PAUSA, NA ORDEM. NO PC OS COMANDOS FICAM SEMPRE A VISTA NO CARTAO (NAO TEM A OPÇAO "COMANDOS")
+function pausa_ids()
+{
+	return MOBILE ? ["continuar", "comandos", "teclas", "dificuldade", "reiniciar", "menu"] : ["continuar", "teclas", "dificuldade", "reiniciar", "menu"];
+}
+
+//O TEXTO DE CADA OPÇAO DA PAUSA (NA MESMA ORDEM DO PAUSA_IDS)
+function pausa_nomes()
+{
+	var _pt = global.linguagem == 0;
+	var _sim = _pt ? "SIM" : "ON", _nao = _pt ? "NÃO" : "OFF";
+	var _ids = pausa_ids();
+	var _r = [];
+	for(var i = 0; i < array_length(_ids); i++)
+	{
+		switch(_ids[i])
+		{
+			case "continuar":	array_push(_r, texto("continuar_jogo")); break;
+			case "comandos":	array_push(_r, _pt ? "COMANDOS" : "CONTROLS"); break;
+			case "teclas":		array_push(_r, (_pt ? "TECLAS: " : "KEYS: ") + (global.mostrar_teclas ? _sim : _nao)); break;
+			case "dificuldade":	array_push(_r, (_pt ? "TESTE DE DIFICULDADE: " : "DIFFICULTY TEST: ") + (global.teste_dif ? _sim : _nao)); break;
+			case "reiniciar":	array_push(_r, texto("reiniciar")); break;
+			case "menu":		array_push(_r, texto("voltar_menu")); break;
+		}
+	}
+	return _r;
+}
+
+//A TABELA DE COMANDOS: A PRIMEIRA LINHA E O CABEÇALHO. SOLO = [ACAO, TECLADO, CONTROLE]. COOP/VERSUS = [ACAO, P1, P2, CONTROLE]
+function pausa_comandos_linhas()
+{
+	var _pt = global.linguagem == 0;
+	var _dois = dois_players();
+	var _a = imputs_jogador(1);
+	var _b = imputs_jogador(2);
+	var _versus = modo_versus();
+	var _mov = function(_i) { return tecla_nome(_i.left) + " " + tecla_nome(_i.rigth); };
+	//[ACAO, TECLAS DO P1, TECLAS DO P2, BOTAO DO CONTROLE] (SOLO NAO TEM A COLUNA DO P2)
+	var _linha = function(_acao, _t1, _t2, _pad, _dois) { return _dois ? [_acao, _t1, _t2, _pad] : [_acao, _t1, _pad]; };
+	var _l = [];
+	array_push(_l, _dois ? [_pt ? "AÇÃO" : "ACTION", "P1", "P2", _pt ? "CONTROLE" : "GAMEPAD"] : [_pt ? "AÇÃO" : "ACTION", _pt ? "TECLADO" : "KEYBOARD", _pt ? "CONTROLE" : "GAMEPAD"]);
+	array_push(_l, _linha(_pt ? "ANDAR" : "MOVE",					_mov(_a),					_mov(_b),					_pt ? "ANALÓG. / D-PAD" : "STICK / D-PAD", _dois));
+	array_push(_l, _linha(_pt ? "PULO" : "JUMP",					tecla_nome(_a.jump),		tecla_nome(_b.jump),		"A", _dois));
+	array_push(_l, _linha(_pt ? "SOCO" : "PUNCH",					tecla_nome(_a.soco),		tecla_nome(_b.soco),		"X", _dois));
+	array_push(_l, _linha(_pt ? "SUPER SOCO" : "SUPER PUNCH",		tecla_nome(_a.soco_press),	tecla_nome(_b.soco_press),	"RB", _dois));
+	array_push(_l, _linha(_pt ? "GIRO" : "SPIN",					tecla_nome(_a.giro),		tecla_nome(_b.giro),		"B", _dois));
+	array_push(_l, _linha(_pt ? "DASH (PODER)" : "DASH (POWER)",	tecla_nome(_a.dash),		tecla_nome(_b.dash),		"Y", _dois));
+	array_push(_l, _linha(_pt ? "TELEPORTAR PEÇA" : "DROP PIECE",	tecla_nome(_a.acelerar),	tecla_nome(_b.acelerar),	"LB / RT", _dois));
+	if(_versus) array_push(_l, _linha(_pt ? "PODER FANTASMA" : "GHOST POWER", tecla_nome(versus_tecla_poder(1)), tecla_nome(versus_tecla_poder(2)), "LT / SELECT", _dois));
+	else array_push(_l, _linha(_pt ? "PARAR O TEMPO" : "TIME STOP", tecla_nome(TEMPO_TECLA), tecla_nome(TEMPO_TECLA), "LT / SELECT", _dois));
+	array_push(_l, _linha(_pt ? "PAUSA" : "PAUSE", "ESC", "ESC", "START", _dois));
+	return _l;
+}
+
+//DESENHA A PAUSA (CHAMADO NO DRAW GUI DO OBJ_GAME_CONTROL). _A = FADE DA PAUSA, _T = FRAMES DESDE QUE PAUSOU (ANIMA A ENTRADA),
+//_SEL = ANIMAÇAO DE CADA OPÇAO (0 A 1), _INDICE = OPÇAO ESCOLHIDA. TUDO EM PIXELS DA ROOM, IGUAL AO MENU PRINCIPAL (MATRIZ DE ESCALA)
+function pausa_menu_desenhar(_a, _t, _sel, _indice)
+{
+	var _e = gui_esc();
+	var _pt = global.linguagem == 0;
+	var _dois = dois_players();
+	//ESCURECE O JOGO (EM PIXELS DA GUI) E PASSA A DESENHAR EM PIXELS DA ROOM
+	var _tl = gui_tela();
+	draw_set_alpha(_a * .6);
+	draw_set_color(c_black);
+	draw_rectangle(_tl[0], _tl[1], _tl[2], _tl[3], false);
+	draw_set_alpha(1);
+	matrix_set(matrix_world, matrix_build(0, 0, 0, 0, 0, 0, _e, _e, 1));
+	//SO DESENHA O MENU INTEIRO ENQUANTO ESTA PAUSADO (FECHANDO, SO O ESCURO VAI SUMINDO)
+	if(instance_exists(obj_game_control) and obj_game_control.pausado)
+	{
+		menu_painel_esq();
+
+		//TITULO E LISTA DE OPÇOES (MESMO VISUAL DA LISTA DO MENU PRINCIPAL)
+		draw_set_font(fnt_table);
+		draw_set_halign(fa_left);
+		draw_set_valign(fa_middle);
+		menu_texto(MENU_LISTA_X, 94, texto("pausado"), #FFE66B, 1, 1);
+		draw_set_font(fnt_hud);
+		var _nomes = pausa_nomes();
+		var _ids = pausa_ids();
+		for(var i = 0; i < array_length(_nomes); i++)
+		{
+			var _s = _sel[i];
+			var _ent = 1 - power(1 - clamp((_t - i * 2) / 10, 0, 1), 3);
+			var _y = 122 + 26 * i;
+			var _x = MENU_LISTA_X + _s * 8 - (1 - _ent) * 70;
+			if(_s > .02)
+			{
+				draw_set_alpha(_ent * _s);
+				draw_rectangle_color(14 - (1 - _s) * 6, _y - 11, MENU_PAINEL_X - 62, _y + 11, #FFB21E, #FFE66B, #FFE66B, #FFB21E, false);
+				var _bob = sin(current_time / 110) * 2;
+				draw_set_color(#FFE66B);
+				draw_triangle(5 + _bob, _y - 5, 5 + _bob, _y + 5, 11 + _bob, _y, false);
+				draw_set_alpha(1);
+			}
+			var _base = (_ids[i] == "dificuldade" and global.teste_dif) ? #FFE66B : #C7CFDD;	//LIGADO FICA AMARELO
+			var _cor = merge_color(_base, #1B1038, _s);
+			//TEXTO LONGO ENCOLHE PRA CABER NA BARRA
+			var _esc = min(1, (MENU_PAINEL_X - 62 - 8 - _x) / max(1, string_width(_nomes[i])));
+			if(_s < .5) menu_texto(_x, _y + 1, _nomes[i], _cor, _ent * (.8 + _s * .4), _esc);
+			else draw_text_transformed_color(_x, _y + 1, _nomes[i], _esc, _esc, 0, _cor, _cor, _cor, _cor, _ent);
+		}
+
+		//CARTAO DA DIREITA: TODOS OS COMANDOS (NO COOP/VERSUS, UMA COLUNA PRA CADA JOGADOR)
+		var _cx1 = 312, _cx2 = room_width - 20, _cy1 = 40;
+		var _ca = clamp((_t - 4) / 10, 0, 1);
+		var _slide = (1 - _ca) * 14;
+		var _linhas = pausa_comandos_linhas();
+		var _passo = 17;
+		//COOP: LINHA EXTRA DIZENDO DE QUEM E A VEZ DE TELEPORTAR
+		var _coop = global.coop and !modo_versus();
+		var _h = 30 + 14 + array_length(_linhas) * _passo + (_coop ? 20 : 8) + 44;
+		menu_cartao_caixa(_cy1, _h, _pt ? "COMANDOS" : "CONTROLS", _ca, _slide);
+		draw_set_valign(fa_middle);
+		//CENTRO DE CADA COLUNA (RELATIVO AO CARTAO) E LARGURA DISPONIVEL EM CADA UMA
+		var _cols = _dois ? [[172, 66], [240, 66], [318, 82]] : [[190, 100], [300, 100]];
+		var _cores = _dois ? [COOP_COR_P1, COOP_COR_P2, #8BFF32] : [ #8BFF32, #31FCFF ];
+		for(var i = 0; i < array_length(_linhas); i++)
+		{
+			var _ly = _cy1 + 44 + i * _passo;
+			var _cab = i == 0;
+			if(!_cab and i mod 2 == 0)
+			{
+				draw_set_alpha(_ca * .5);
+				draw_set_color(#1E1A38);
+				draw_rectangle(_cx1 + 6, _ly - 8, _cx2 - 6, _ly + 8, false);
+				draw_set_alpha(1);
+			}
+			draw_set_halign(fa_left);
+			var _l0 = _linhas[i][0];
+			var _e0 = min(.8, 130 / max(1, string_width(_l0)));
+			menu_texto(_cx1 + 14 + _slide, _ly, _l0, _cab ? #FFE66B : c_white, _ca, _e0);
+			draw_set_halign(fa_center);
+			for(var c = 0; c < array_length(_cols); c++)
+			{
+				var _txt = _linhas[i][c + 1];
+				var _ec = min(.8, _cols[c][1] / max(1, string_width(_txt)));
+				menu_texto(_cx1 + _cols[c][0] + _slide, _ly, _txt, _cores[c], _ca, _ec);
+			}
+		}
+		draw_set_halign(fa_left);
+		var _fy = _cy1 + 44 + array_length(_linhas) * _passo;
+		//COOP: UM TELEPORTE DE CADA VEZ
+		if(_coop)
+		{
+			var _v = coop_vez_de();
+			var _msg = (_pt ? "TELEPORTE: UM DE CADA VEZ. AGORA É A VEZ DO P" : "DROP: TAKE TURNS. NOW IT IS P") + string(_v);
+			menu_texto(_cx1 + 14 + _slide, _fy + 4, _msg, _v == 1 ? COOP_COR_P1 : COOP_COR_P2, _ca, min(.75, (_cx2 - _cx1 - 28) / max(1, string_width(_msg))));
+			_fy += 20;
+		}
+		//DICA
+		draw_set_valign(fa_top);
+		menu_texto(_cx1 + 14 + _slide, _fy + 8, menu_quebrar(texto("dica_especial"), _cx2 - _cx1 - 28, .75), #31FCFF, _ca, .75);
+
+		//BARRA DE TECLAS EMBAIXO
+		menu_dicas([["SETAS", _pt ? "ESCOLHER" : "CHOOSE"], ["ENTER", _pt ? "SELECIONAR" : "SELECT"], ["ESC", _pt ? "CONTINUAR" : "RESUME"], ["R", _pt ? "REINICIAR" : "RESTART"], ["Q", "MENU"]]);
+	}
+	matrix_set(matrix_world, matrix_build_identity());
+	draw_set_alpha(1);
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	draw_set_color(c_white);
 }

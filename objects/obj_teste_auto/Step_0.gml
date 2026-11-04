@@ -22,13 +22,56 @@ if(timer == 1)
 	with(obj_area) alarm[0] = 99999;
 	with(obj_game_control) { onda_proxima = 99999; letra_timer = 99999; laser_proxima = 99999; }
 	player_longe();
-	etapa = "jcoop";
+	etapa = "pausa_coop";
 	marca = timer;
 }
 global.tempo_partida = 30; //SEM DESAFIO NO MEIO DO TESTE
 
 switch(etapa)
 {
+	#region PAUSA NOVA (VISUAL DO MENU PRINCIPAL) NO SOLO, NO COOP (COM A VEZ DO TELEPORTE) E NO VERSUS
+	case "pausa_solo":
+		if(_t == 2 and room != rm_arcade) { global.coop = false; room_goto(rm_arcade); exit; } //(A PRIMEIRA ROOM DO PROJETO PODE SER O COOP)
+		if(_t == 5) { obj_game_control.pausado = true; log("room=" + room_get_name(room) + " coop=" + string(global.coop) + " dois=" + string(dois_players())); }
+		if(_t == 40) screen_save("teste_p1_pausa_solo.png");
+		if(_t == 42) obj_game_control.opcao_pause = 2;
+		if(_t == 70) screen_save("teste_p1b_pausa_solo_sel.png");
+		if(_t == 75) { log("FIM"); game_end(); }
+		break;
+	case "pausa_versus":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 5) obj_game_control.pausado = true;
+		if(_t == 40) { screen_save("teste_p6_pausa_versus.png"); log("room=" + room_get_name(room) + " dois=" + string(dois_players()) + " linhas=" + string(array_length(pausa_comandos_linhas()))); }
+		if(_t == 45) { log("FIM"); game_end(); }
+		break;
+	case "pausa_coop":
+		if(_t == 2)
+		{
+			if(room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+			_limpar(); _player(-200, 100);
+		}
+		//DUAS PEÇAS NASCEM: A DA ESQUERDA E A ATUAL (PECA_INST), A DA DIREITA E A SEGUINTE
+		if(_t == 5 or _t == 6)
+		{
+			global.prox_tipo = tipo_peca.O; global.prox_especie = "normal"; global.prox_fantasmas = 0; global.prox_gelo = false; global.prox_cor = _t == 5 ? cores.c_green : cores.c_red;
+			var _c = instance_create_layer(obj_area.x + 8 + 16 * (_t == 5 ? 3 : 11), obj_area.y + 8 - 32, "Linha", obj_cria_peca);
+			with(_c) event_perform(ev_alarm, 0);
+		}
+		if(_t == 12) log("inicio: vez=" + string(global.coop_vez) + " de_quem=" + string(coop_vez_de()) + " peca_atual existe=" + string(instance_exists(global.peca_inst)));
+		if(_t == 30) screen_save("teste_p2_vez_p1.png");
+		if(_t == 32) { var _a = global.peca_inst; coop_teleporte(2); log("P2 tentou na vez do P1: peca atual igual=" + string(_a == global.peca_inst) + " vez=" + string(global.coop_vez) + " (esperado: igual, vez 1)"); }
+		if(_t == 45) screen_save("teste_p3_recusa.png");
+		if(_t == 50) { var _a = global.peca_inst; coop_teleporte(1); log("P1 teleportou: peca atual trocou=" + string(_a != global.peca_inst) + " vez=" + string(global.coop_vez) + " (esperado: trocou, vez 2)"); }
+		if(_t == 75) screen_save("teste_p4_vez_p2.png");
+		if(_t == 78) { var _a = global.peca_inst; coop_teleporte(1); log("P1 tentou na vez do P2: peca atual igual=" + string(_a == global.peca_inst) + " vez=" + string(global.coop_vez) + " (esperado: igual, vez 2)"); }
+		if(_t == 90) { var _a = global.peca_inst; coop_teleporte(2); log("P2 teleportou: peca atual trocou=" + string(_a != global.peca_inst) + " vez=" + string(global.coop_vez) + " (esperado: trocou, vez 1)"); }
+		if(_t == 95) { var _p1 = player_n(1); _p1.estado = state.morte; log("P1 morto: vez de quem=" + string(coop_vez_de()) + " (esperado 2, pois o dono da vez morreu)"); _p1.estado = state.idle; }
+		if(_t == 100) { obj_game_control.pausado = true; }
+		if(_t == 140) { screen_save("teste_p5_pausa_coop.png"); log("tabela: " + string(array_length(pausa_comandos_linhas())) + " linhas, P2 teleporte=" + tecla_nome(imputs_jogador(2).acelerar) + " soco=" + tecla_nome(imputs_jogador(2).soco)); }
+		if(_t == 145) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
 	case "jcoop":
 		if(_t == 2)

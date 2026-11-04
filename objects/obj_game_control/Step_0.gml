@@ -15,9 +15,6 @@ var _down	= keyboard_check_pressed(ord("S")) or keyboard_check_pressed(vk_down);
 var _enter	= keyboard_check_pressed(vk_space) or keyboard_check_pressed(vk_enter) or (MOBILE and keyboard_check_pressed(global.imputs.soco));
 var _voltar	= keyboard_check_pressed(vk_escape);
 
-//ZORG: A FRASE NO TOPO DA TELA (SCR_PODERES)
-if(!pausado and !menu_poder) zorg_atualizar();
-
 #region FIM DE JOGO (TELA DE RESULTADO)
 if(_player_morto and !fim_jogo)
 {
@@ -27,7 +24,6 @@ if(_player_morto and !fim_jogo)
 	{
 		fim_jogo = true;
 		if(modo_versus() and !global.vs_contou and global.vs_perdedor > 0) { global.vs_contou = true; global.vs_vitorias[2 - global.vs_perdedor]++; } //VERSUS: UMA VITORIA PRA QUEM FICOU
-		zorg_falar("morte", true);
 		recorde_checar();
 		novo_recorde = recorde_atual() > recorde_inicio and global.pontos_1 > 0;
 		jogo_salvar();
@@ -146,7 +142,7 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 		opcao_pause = 0;
 		som_tocar(pausado ? snd_menu_select_01 : snd_menu_erro_02);
 	}
-	//PAUSADO: CIMA/BAIXO ESCOLHE (CONTINUAR, COMANDOS, REINICIAR, MENU), R REINICIA, Q VAI PRO MENU
+	//PAUSADO: CIMA/BAIXO ESCOLHE (PAUSA_IDS, SCR_MENU), R REINICIA, Q VAI PRO MENU
 	//NA TELA DOS COMANDOS QUALQUER TECLA DE CONFIRMAR OU VOLTAR FECHA ELA (O ESC NAO TIRA DA PAUSA)
 	else if(pausado and ver_comandos)
 	{
@@ -154,9 +150,10 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 	}
 	else if(pausado)
 	{
+		var _ids = pausa_ids();
 		if(_up xor _down)
 		{
-			opcao_pause = (opcao_pause + _down - _up + 6) mod 6;
+			opcao_pause = (opcao_pause + _down - _up + array_length(_ids)) mod array_length(_ids);
 			som_tocar(snd_menu_select_03);
 		}
 		if(keyboard_check_pressed(ord("R"))) { reiniciar(); exit; }
@@ -164,18 +161,18 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 		if(_enter)
 		{
 			som_tocar(snd_menu_select_01);
-			switch(opcao_pause)
+			switch(_ids[opcao_pause])
 			{
-				case 0: pausado = false; break;
-				case 1: ver_comandos = true; break;
-				case 2: global.mostrar_teclas = !global.mostrar_teclas; jogo_salvar(); break; //LIGA/DESLIGA A TIRA DE COMANDOS
-				case 3:	//TESTE DE DIFICULDADE: LIGA/DESLIGA E REINICIA NA HORA (LIGADO: LEVEL 3 E 20 MIN, TODOS OS BLOCOS)
+				case "continuar": pausado = false; break;
+				case "comandos": ver_comandos = true; break; //(SO NO CELULAR: NO PC OS COMANDOS FICAM SEMPRE NA TELA)
+				case "teclas": global.mostrar_teclas = !global.mostrar_teclas; jogo_salvar(); break; //LIGA/DESLIGA A TIRA DE COMANDOS
+				case "dificuldade":	//TESTE DE DIFICULDADE: LIGA/DESLIGA E REINICIA NA HORA (LIGADO: LEVEL 3 E 20 MIN, TODOS OS BLOCOS)
 					if(modo_versus() or MOBILE) { som_tocar(snd_menu_erro_04); break; }
 					global.teste_dif = !global.teste_dif;
 					reiniciar();
 					exit;
-				case 4: reiniciar(); exit;
-				case 5: voltar_menu(); exit;
+				case "reiniciar": reiniciar(); exit;
+				case "menu": voltar_menu(); exit;
 			}
 		}
 	}
@@ -183,6 +180,9 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 	else if(keyboard_check_pressed(ord("R"))) { reiniciar(); exit; }
 }
 alpha_pause = lerp(alpha_pause, pausado ? 1 : 0, .25);
+//ANIMAÇAO DA PAUSA DO PC: ENTRADA DA LISTA/CARTAO E A BARRA DA OPÇAO ESCOLHIDA
+pause_t = pausado ? pause_t + 1 : 0;
+for(var i = 0; i < array_length(pause_sel); i++) pause_sel[i] = lerp(pause_sel[i], (pausado and opcao_pause == i) ? 1 : 0, .25);
 #endregion
 
 #region MENU DE PODER (COMPLETOU D R O P)
@@ -199,7 +199,6 @@ if(!menu_poder and !pausado and !_player_morto and modo_arcade() and !modo_versu
 	if(!palavra_festejada)
 	{
 		palavra_festejada = true;
-		zorg_falar("palavra");
 		global.palavra_festa = PALAVRA_FESTA;
 		shakes(6, 2);
 		with(obj_borda) onda_choque(x + dx_hud + 212, y + 215, 70, 5, 30);
@@ -369,7 +368,6 @@ if(modo_arcade() and !modo_versus() and !instance_exists(obj_onda_laser))
 	{
 		laser_proxima = LASER_ONDA_INTERVALO;
 		instance_create_depth(0, 0, -2050, obj_onda_laser);
-		zorg_falar("laser");
 	}
 }
 
@@ -401,7 +399,7 @@ if(instance_exists(obj_area))
 	
 	//PERIGO: TEM BLOCO PARADO NAS 4 LINHAS DE CIMA DA ARENA
 	global.perigo = _mais_alto < obj_area.y + CEL * 4;
-	if(global.perigo and !_antes) { som_tocar(snd_menu_erro_03); zorg_falar("perigo"); }
+	if(global.perigo and !_antes) som_tocar(snd_menu_erro_03);
 	
 	//ALTURA DA PILHA (0 VAZIA, 1 NO TOPO): A MUSICA ACELERA CONFORME ELA SOBE
 	global.altura_pilha = (_fundo - _mais_alto) / obj_area.sprite_height;
@@ -417,6 +415,13 @@ if(modo_versus())
 		if(keyboard_check_pressed(imputs_jogador(_n).acelerar)) versus_teleporte(_n);
 		if(keyboard_check_pressed(versus_tecla_poder(_n))) versus_poder_alternar(_n); //PODER DO FANTASMA (SCR_COOP)
 	}
+}
+else if(global.coop)
+{
+	//COOP: OS DOIS TELEPORTAM, UM DE CADA VEZ (SCR_COOP)
+	if(global.coop_vez_aviso > 0) global.coop_vez_aviso--;
+	global.coop_vez_pop = max(0, global.coop_vez_pop - .06);
+	for(var _n = 1; _n <= 2; _n++) if(keyboard_check_pressed(imputs_jogador(_n).acelerar)) coop_teleporte(_n);
 }
 else if(keyboard_check_pressed(global.imputs.acelerar))
 {

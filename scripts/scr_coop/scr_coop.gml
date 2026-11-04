@@ -45,6 +45,94 @@ function todos_mortos()
 	return !_vivo;
 }
 
+//==================== COOP: TELEPORTE DA PEÇA, UM DE CADA VEZ ====================
+//OS DOIS JOGADORES PODEM TELEPORTAR A PEÇA ATUAL, MAS NA VEZ: QUEM TELEPORTOU PASSA A VEZ PRO OUTRO. SE O DONO DA VEZ ESTA MORTO,
+//O OUTRO TELEPORTA NO LUGAR DELE. DE QUEM E A VEZ APARECE NA CAIXA DO JOGADOR (PISCA NA COR DELE) E EM CIMA DA PEÇA ATUAL (ETIQUETA P1/P2)
+global.coop_vez			= 1;	//DE QUEM E A VEZ (1 OU 2)
+global.coop_vez_pop		= 0;	//1 A 0: PULINHO DA ETIQUETA QUANDO A VEZ TROCA
+global.coop_vez_aviso	= 0;	//FRAMES ATE PODER AVISAR DE NOVO "NAO E A SUA VEZ"
+
+//COMEÇOU UMA PARTIDA: A VEZ COMEÇA NO PLAYER 1
+function coop_vez_reiniciar()
+{
+	global.coop_vez = 1;
+	global.coop_vez_pop = 0;
+	global.coop_vez_aviso = 0;
+}
+
+//DE QUEM E A VEZ DE VERDADE (1 OU 2): SE O DONO DA VEZ ESTA MORTO E O OUTRO VIVO, E DO OUTRO
+function coop_vez_de()
+{
+	var _v = global.coop_vez;
+	var _p = player_n(_v), _o = player_n(3 - _v);
+	var _dono_morto = _p == noone or _p.estado == state.morte;
+	var _outro_vivo = _o != noone and _o.estado != state.morte;
+	return (_dono_morto and _outro_vivo) ? 3 - _v : _v;
+}
+
+//O JOGADOR _N APERTOU A TECLA DE TELEPORTE. SO TELEPORTA SE FOR A VEZ DELE
+function coop_teleporte(_n)
+{
+	fila_limpar();
+	if(!instance_exists(global.peca_inst)) return;
+	var _p = player_n(_n);
+	if(_p == noone or _p.estado == state.morte) return;
+	if(coop_vez_de() != _n)
+	{
+		//NAO E A VEZ DELE: AVISA NA COR DO OUTRO (SEM FICAR REPETINDO SE ELE MARTELAR A TECLA)
+		if(global.coop_vez_aviso <= 0)
+		{
+			global.coop_vez_aviso = room_speed div 2;
+			var _o = string(3 - _n);
+			efeito_texto(global.linguagem == 0 ? "VEZ DO P" + _o : "P" + _o + "'S TURN", _p.x, _p.y - 30, _n == 1 ? COOP_COR_P2 : COOP_COR_P1, 1);
+			som_tocar(snd_menu_erro_03, .1);
+		}
+		return;
+	}
+	teleporte_acionar();
+	habil_aprender("teleporte");
+	global.coop_vez = 3 - _n;
+	global.coop_vez_pop = 1;
+}
+
+//ETIQUETA "P1"/"P2" EM CIMA DA PEÇA ATUAL (A QUE TELEPORTA), NA COR DE QUEM TEM A VEZ. DESENHADA NA GUI (POR CIMA DE TUDO)
+function coop_vez_desenhar()
+{
+	if(!global.coop or modo_versus() or MOBILE or !instance_exists(global.peca_inst)) exit;
+	//TOPO E MEIO DA PEÇA ATUAL (TODOS OS BLOCOS DELA)
+	var _topo = infinity, _x1 = infinity, _x2 = -infinity, _alvo = global.peca_inst;
+	with(obj_peca) if(pai == _alvo and destruido_por == noone)
+	{
+		_topo = min(_topo, bbox_top);
+		_x1 = min(_x1, bbox_left);
+		_x2 = max(_x2, bbox_right);
+	}
+	if(_topo == infinity) exit;
+	var _e = gui_esc();
+	var _n = coop_vez_de();
+	var _cor = _n == 1 ? COOP_COR_P1 : COOP_COR_P2;
+	var _txt = "P" + string(_n);
+	var _pop = global.coop_vez_pop;
+	var _bob = sin(current_time / 170) * 1.5;
+	var _cx = (_x1 + _x2) / 2;
+	var _w = 11 + 3 * _pop, _h = 8 + 2 * _pop;
+	var _cy = max(_topo - 11 + _bob, _h + 2);	//SE A PEÇA TA NO TOPO DA TELA A ETIQUETA ENCOSTA NO ALTO
+	draw_set_font(fnt_hud);
+	draw_set_halign(fa_center);
+	draw_set_valign(fa_middle);
+	//SETINHA PRA BAIXO, FUNDO ESCURO COM CONTORNO NA COR DO JOGADOR E O TEXTO
+	draw_set_color(_cor);
+	draw_triangle((_cx - 3) * _e, (_cy + _h - 1) * _e, (_cx + 3) * _e, (_cy + _h - 1) * _e, _cx * _e, (_cy + _h + 4) * _e, false);
+	draw_set_color(#0E071B);
+	draw_rectangle((_cx - _w) * _e, (_cy - _h) * _e, (_cx + _w) * _e, (_cy + _h) * _e, false);
+	draw_set_color(_cor);
+	draw_rectangle((_cx - _w) * _e, (_cy - _h) * _e, (_cx + _w) * _e, (_cy + _h) * _e, true);
+	draw_text_transformed_color(_cx * _e, (_cy + 1) * _e, _txt, _e * .7, _e * .7, 0, _cor, _cor, _cor, _cor, 1);
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	draw_set_color(c_white);
+}
+
 //ALGUM PLAYER VIVO TA SEM A VIDA CHEIA? (O BLOCO ESPECIAL SO SORTEIA +1 VIDA SE TIVER)
 function alguem_sem_vida_cheia()
 {
@@ -1439,6 +1527,22 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	var _nome = "PLAYER " + string(_n);
 	draw_text_transformed_color(_x + 13, _y + 7.5, _nome, .55, .55, 0, _sombra, _sombra, _sombra, _sombra, 1);
 	draw_text_transformed_color(_x + 12, _y + 6.5, _nome, .55, .55, 0, c_white, c_white, c_white, c_white, 1);
+
+	//VEZ DO TELEPORTE: A CAIXA DE QUEM TEM A VEZ PISCA NA COR DELE E GANHA A ETIQUETA "TELE" NA FAIXA DO NOME
+	if(coop_vez_de() == _n)
+	{
+		var _pul = .5 + .5 * sin(current_time / 140);
+		draw_set_color(_cor_j);
+		draw_set_alpha(.6 + .4 * _pul);
+		draw_rectangle(_x - 2, _y - 2, _x + COOP_CAIXA_W + 1, _y + COOP_CAIXA_H + 1, true);
+		draw_rectangle(_x - 1, _y - 1, _x + COOP_CAIXA_W, _y + COOP_CAIXA_H, true);
+		draw_rectangle(_x, _y, _x + COOP_CAIXA_W - 1, _y + COOP_CAIXA_H - 1, true);
+		draw_set_alpha(1);
+		draw_rectangle_color(_x + 66, _y + 2, _x + 99, _y + 12, _cor_j, _cor_j, _cor_j, _cor_j, false);
+		draw_set_halign(fa_center);
+		draw_text_transformed_color(_x + 83, _y + 7.5, "TELE", .5, .5, 0, _sombra, _sombra, _sombra, _sombra, 1);
+		draw_set_halign(fa_left);
+	}
 
 	//BARRA DE ENERGIA (COLUNA DA ESQUERDA, 4 QUADRADOS): SOBE DE BAIXO PRA CIMA. CHEIA PISCA, E AO ENCHER DA UM CLARAO
 	var _ex1 = _x + 2, _ex2 = _x + 19, _ebase = _y + 80, _ealt = 66;
