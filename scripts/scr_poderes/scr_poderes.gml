@@ -824,3 +824,569 @@ function teclas_desenhar()
 	draw_set_color(c_white);
 	draw_set_alpha(1);
 }
+
+
+//==================== GORZ, O ALIEN QUE CONTROLA A GRADE ====================
+//NOS MOMENTOS MAIORES (LASER, MINI GAME, PEÇAS MAIS RAPIDAS, CHUVA DE PEÇAS, PERIGO, MORTE, E QUANDO O JOGADOR VAI BEM) A CABEÇA DO GORZ ENTRA PELO CANTO
+//DE BAIXO ESQUERDO E UMA FAIXA ESCURA INCLINADA CORRE ATE O LUGAR, COM LINHAS DE VELOCIDADE PASSANDO POR TRAS. A FRASE E ESCRITA LETRA POR LETRA (MAQUINA DE ESCREVER)
+//E ALGUMAS PALAVRAS GANHAM COR E ANIMAÇAO. SO ISSO: NAO PAUSA, NAO PEDE ENTER.
+//TODAS AS FRASES FICAM EM GORZ_FRASES. GORZ_FALAR("EVENTO") E CHAMADO NOS PONTOS DO JOGO. PRA TIRAR O GORZ SEM APAGAR CODIGO: GORZ_ATIVO = FALSE.
+//
+//MARCAÇAO NAS FRASES (CADA ETIQUETA VALE ATE A PROXIMA </>):
+//	<r> VERMELHO, MAIOR, TREMENDO E PULSANDO (NOMES E AMEAÇAS)	<y> AMARELO ONDULANDO		<c> CIANO TREMENDO DE FRIO
+//	<o> LARANJA PEGANDO FOGO									<g> VERDE COM DEFEITO (GLITCH)	<m> ARCO-IRIS ONDULANDO
+//{N} VIRA O NOME DO PERSONAGEM (VER HEROI_TEXTO). A ARTE DA CABEÇA E A SPRITE SPR_GORZ (5 FRAMES).
+#macro GORZ_ATIVO		true
+#macro GORZ_ESPERA		(room_speed * 20)	//TEMPO MINIMO ENTRE UMA FALA E OUTRA (PRA NAO FICAR REPETITIVO)
+#macro GORZ_VEL_TEXTO	.6					//LETRAS POR FRAME NA MAQUINA DE ESCREVER
+#macro GORZ_INICIO_S	.4					//SEGUNDOS DE PARTIDA ATE ELE SE APRESENTAR (NO COMEÇO: A 1A PEÇA SO NASCE QUANDO ELE SOME)
+#macro GORZ_ANG			16					//INCLINAÇAO DA FAIXA E DO TEXTO (GRAUS, SOBE PRA DIREITA)
+#macro GORZ_FAIXA_C		190					//COMPRIMENTO DA FAIXA ESCURA (PX DA ROOM)
+#macro GORZ_FAIXA_ESP	66					//ESPESSURA DA FAIXA
+#macro GORZ_TEXTO_W		158					//LARGURA MAXIMA DO TEXTO NA FAIXA
+#macro GORZ_TEXTO_H		48					//ALTURA MAXIMA DO TEXTO NA FAIXA
+#macro GORZ_ESC_CABECA	1.5					//TAMANHO DA CABEÇA (A SPRITE TEM 100X100)
+#macro GORZ_LINHAS_N	46					//QUANTAS LINHAS DE VELOCIDADE
+#macro GORZ_LINHAS_X	240					//AS LINHAS SO APARECEM ATE ESSE X (NUNCA COBREM A ARENA)
+
+global.gorz = undefined;	//A FALA NA TELA AGORA (UNDEFINED = ESCONDIDO)
+global.gorz_cd = 0;			//FRAMES ATE ELE PODER FALAR DE NOVO
+global.gorz_inicio = false;	//JA SE APRESENTOU NESSA PARTIDA?
+global.gorz_ultima = "";	//ULTIMA FRASE (PRA NAO REPETIR NA SEQUENCIA)
+global.gorz_intro = false;	//ELE AINDA VAI SE APRESENTAR (OU ESTA SE APRESENTANDO): A 1A PEÇA FICA ESPERANDO (OBJ_AREA, ALARM 0)
+global.gorz_trava = false;	//A CENA DA QUEDA TRAVA OS COMANDOS DO PLAYER ATE ELE POUSAR
+global.zq = undefined;		//ESTADO DA CENA DA QUEDA: { SUB, T } (UNDEFINED = NAO ESTA ACONTECENDO)
+global.gorz_placa = [];		//A PLACA "COM... GORZ" DA SPRITE, UMA SURFACE POR FRAME (PRA PODER GIRAR JUNTO COM A FAIXA)
+
+//COMEÇOU A PARTIDA (CHAMADO NO CREATE DO OBJ_GAME_CONTROL)
+function gorz_iniciar()
+{
+	global.gorz = undefined;
+	global.gorz_cd = 0;
+	global.gorz_inicio = false;
+	global.gorz_ultima = "";
+	//ELE ABRE A PARTIDA: A PRIMEIRA PEÇA SO NASCE DEPOIS DA FALA DELE
+	global.gorz_intro = GORZ_ATIVO and modo_arcade() and !modo_versus();
+	//A ABERTURA: O PERSONAGEM CAI DE CIMA E O GORZ APARECE NO PULINHO (GORZ_QUEDA_ATUALIZAR)
+	global.zq = global.gorz_intro ? { sub : 0, t : 0 } : undefined;
+	global.gorz_trava = false;
+}
+
+//A 1A PEÇA DEVE ESPERAR? (OBJ_AREA, ALARM 0). SO ENQUANTO ELE SE APRESENTA. TRAVA DE SEGURANÇA: DEPOIS DE 16S DE PARTIDA SOLTA SEMPRE
+function gorz_segurando()
+{
+	return global.gorz_intro and global.tempo_partida < 16;
+}
+
+//AS FRASES DE CADA EVENTO (COM A MARCAÇAO DE COR/ANIMAÇAO DESCRITA ACIMA)
+function gorz_frases(_ev)
+{
+	switch(_ev)
+	{
+		case "inicio":		return ["BEM VINDO À MINHA JAULA <r>{N}</>", "EU CONTROLO CADA <o>BLOCO</>. VOCÊ <r>NÃO</> VAI SUBIR."];
+		case "laser":		return ["SINTA O <o>CALOR</>, <r>{N}</>!", "MIRA {NO} <r>{N}</>! <o>FOGO!</>", "NÃO PISQUE. SERIA A SUA <r>ÚLTIMA</> VEZ.", "ESSE EU MIREI <y>DIREITINHO</>."];
+		case "minigame":	return ["QUE TAL UM <y>JOGUINHO</>? PERDER <r>DÓI</>.", "RESOLVA, SE FOR TÃO <m>ESPERTO</>.", "{O} <r>{N}</> PODE SAIR PARA <y>BRINCAR</>?"];
+		case "rapido":		return ["ACELEREI A GRADE. <y>DE NADA</>.", "MAIS <o>RÁPIDO</>, <r>{N}</>! O TEMPO É MEU ALIADO.", "SUAS PERNAS JÁ ESTÃO <c>CANSADAS</>?"];
+		case "onda":		return ["<m>CHUVA</> DE <y>BLOCOS</>!", "UM POUCO DE <o>DIVERSÃO</>."];
+		case "perigo":		return ["JÁ ESTÁ NO <r>TOPO</>... É O <r>FIM</>.", "DESISTA, <r>{N}</>.", "VOCÊ <r>NÃO</> VAI SUBIR."];
+		case "morte":		return ["EU DISSE QUE VOCÊ <r>NÃO</> SUBIA.", "FIM DE JOGO, <r>{N}</>. A JAULA <o>VENCEU</>.", "TENTE DE NOVO. EU GOSTO DE VER VOCÊ <y>CAIR</>."];
+		case "combo":		return ["<g>IMPOSSÍVEL</>! COMO FEZ ISSO?!", "SORTE DE <y>INICIANTE</>. SÓ ISSO."];
+		case "level":		return ["ISSO NÃO ERA PRA <g>ACONTECER</>...", "VOCÊ AINDA VAI <r>ENGASGAR</>, <r>{N}</>."];
+		case "palavra":		return ["<r>DEVOLVE</> ESSE PODER!", "ISSO ERA <o>MEU</>! VOCÊ ME <r>PAGA</>!"];
+		case "frio":		return ["SENTE O <c>FRIO</>, <r>{N}</>?", "A JAULA ESTÁ <c>CONGELANDO</>. QUE PENA.", "TUDO VIRA <c>GELO</>. ESCORREGA, <r>{N}</>!"];
+	}
+	return [];
+}
+
+//O HUMOR DE CADA EVENTO (MEXE NA CABEÇA): 0 NORMAL, 1 RINDO (BALANÇA MUITO), 2 IRRITADO (PISCA VERMELHO, QUANDO O JOGADOR VAI BEM)
+function gorz_cara_do_evento(_ev)
+{
+	switch(_ev)
+	{
+		case "laser": case "minigame": case "rapido": case "onda": case "morte": case "frio":	return 1;
+		case "combo": case "level": case "palavra":					return 2;
+	}
+	return 0;
+}
+
+//QUEBRA A FRASE EM PALAVRAS COM A MARCAÇAO: [{ T : TEXTO, ST : ESTILO ("" = NORMAL), LS : TEM ESPAÇO ANTES? }]
+function gorz_palavras(_txt)
+{
+	var _r = [], _w = "", _st = "", _ws = "", _sp = false, _n = string_length(_txt), i = 1, _lsw = false;
+	while(i <= _n)
+	{
+		var _c = string_char_at(_txt, i);
+		if(_c == "<" and i + 2 <= _n and string_char_at(_txt, i + 2) == ">")
+		{
+			//ETIQUETA <X> OU </>: FECHA A PALAVRA ATUAL E TROCA O ESTILO
+			if(_w != "") array_push(_r, { t : _w, st : _ws, ls : _lsw });
+			_w = "";
+			var _tag = string_char_at(_txt, i + 1);
+			_st = _tag == "/" ? "" : _tag;
+			i += 3;
+			continue;
+		}
+		if(_c == " ")
+		{
+			if(_w != "") array_push(_r, { t : _w, st : _ws, ls : _lsw });
+			_w = "";
+			_sp = true;
+		}
+		else
+		{
+			if(_w == "") { _ws = _st; _lsw = _sp and array_length(_r) > 0; _sp = false; }
+			_w += _c;
+		}
+		i++;
+	}
+	if(_w != "") array_push(_r, { t : _w, st : _ws, ls : _lsw });
+	return _r;
+}
+
+//TAMANHO EXTRA DE CADA ESTILO (O VERMELHO E MAIOR)
+function gorz_estilo_esc(_st)
+{
+	return _st == "r" ? 1.25 : 1;
+}
+
+//MONTA A FRASE NA FAIXA: ESCOLHE O MAIOR TAMANHO EM QUE ELA CABE (QUEBRANDO EM LINHAS) E DEVOLVE CADA LETRA COM SUA POSIÇAO (U = PRA FRENTE, V = PRA BAIXO)
+//{ CH : [{ C, U, V, S, ST }], N : QUANTAS LETRAS, ALT : ALTURA DO TEXTO }
+function gorz_montar(_txt)
+{
+	var _pal = gorz_palavras(_txt);
+	//UNIDADES: UMA PALAVRA SOZINHA OU PALAVRAS COLADAS (EX: "NÃO" + ",") QUE NAO PODEM QUEBRAR ENTRE ELAS
+	var _un = [];
+	for(var i = 0; i < array_length(_pal); i++)
+	{
+		if(!_pal[i].ls and array_length(_un) > 0) array_push(_un[array_length(_un) - 1], _pal[i]);
+		else array_push(_un, [_pal[i]]);
+	}
+	draw_set_font(fnt_hud);
+	var _base = string_height("A");
+	var _esp = max(string_width(" "), 3);
+	var _escs = [1.5, 1.3, 1.15, 1, .9, .8, .7];
+	var _linhas = [], _alt = 0, _s = .7;
+	for(var e = 0; e < array_length(_escs); e++)
+	{
+		_s = _escs[e];
+		_linhas = [];
+		var _cur = { us : [], w : 0, big : false }, _cabe = true;
+		for(var k = 0; k < array_length(_un); k++)
+		{
+			var _uw = 0, _ubig = false;
+			for(var j = 0; j < array_length(_un[k]); j++)
+			{
+				var _p = _un[k][j];
+				_uw += string_width(_p.t) * _s * gorz_estilo_esc(_p.st);
+				if(gorz_estilo_esc(_p.st) > 1) _ubig = true;
+			}
+			var _add = _uw + (array_length(_cur.us) > 0 ? _esp * _s : 0);
+			if(_cur.w + _add > GORZ_TEXTO_W and array_length(_cur.us) > 0)
+			{
+				array_push(_linhas, _cur);
+				_cur = { us : [], w : 0, big : false };
+				_add = _uw;
+			}
+			array_push(_cur.us, k);
+			_cur.w += _add;
+			_cur.big = _cur.big or _ubig;
+			if(_uw > GORZ_TEXTO_W) _cabe = false;
+		}
+		array_push(_linhas, _cur);
+		_alt = 0;
+		for(var l = 0; l < array_length(_linhas); l++) _alt += _base * _s * (_linhas[l].big ? 1.25 : 1) * 1.12;
+		if(_cabe and _alt <= GORZ_TEXTO_H) break;
+	}
+	//AS LETRAS (SEM OS ESPAÇOS: A MAQUINA DE ESCREVER SO CONTA O QUE APARECE)
+	var _ch = [], _v0 = 0;
+	for(var l = 0; l < array_length(_linhas); l++)
+	{
+		var _lh = _base * _s * (_linhas[l].big ? 1.25 : 1);
+		var _u = 0;
+		for(var q = 0; q < array_length(_linhas[l].us); q++)
+		{
+			var _uni = _un[_linhas[l].us[q]];
+			for(var j = 0; j < array_length(_uni); j++)
+			{
+				var _p = _uni[j];
+				var _cs = _s * gorz_estilo_esc(_p.st);
+				for(var c = 1; c <= string_length(_p.t); c++)
+				{
+					var _letra = string_char_at(_p.t, c);
+					array_push(_ch, { c : _letra, u : _u, v : _v0 + _lh - _base * _cs, s : _cs, st : _p.st });
+					_u += string_width(_letra) * _cs;
+				}
+			}
+			_u += _esp * _s;
+		}
+		_v0 += _lh * 1.12;
+	}
+	return { ch : _ch, n : array_length(_ch), alt : _alt };
+}
+
+//O GORZ APARECE E FALA (_FORCAR = IGNORA O TEMPO ENTRE FALAS E SUBSTITUI A QUE ESTA NA TELA, EX: A MORTE)
+function gorz_falar(_ev, _forcar = false)
+{
+	if(!GORZ_ATIVO or !modo_arcade() or modo_versus()) return;
+	if(!_forcar and (global.gorz_cd > 0 or !is_undefined(global.gorz))) return;
+	var _frases = gorz_frases(_ev);
+	if(array_length(_frases) == 0) return;
+	//SORTEIA UMA FRASE DIFERENTE DA ULTIMA
+	var _f = _frases[irandom(array_length(_frases) - 1)];
+	if(array_length(_frases) > 1) while(_f == global.gorz_ultima) _f = _frases[irandom(array_length(_frases) - 1)];
+	global.gorz_ultima = _f;
+	var _m = gorz_montar(heroi_texto(_f));	//{N} VIRA O NOME DO PERSONAGEM ESCOLHIDO
+	global.gorz = {
+		ev : _ev,
+		ch : _m.ch,
+		n : _m.n,
+		alt : _m.alt,
+		chars : 0,
+		cara : gorz_cara_do_evento(_ev),
+		t : 0,
+		dur : max(room_speed * 3.6, _m.n / GORZ_VEL_TEXTO + room_speed * 2.8),
+	};
+	if(_ev == "morte") global.gorz.dur = room_speed * 6;
+	global.gorz_cd = GORZ_ESPERA;
+	//ENTRADA: UM GRAVE MALVADO E UM CHIADO RAPIDO
+	audio_play_sound(snd_hit2, 1, false, .45, 0, .45);
+	audio_play_sound(snd_menu_erro_03, 1, false, .25, 0, .55);
+}
+
+//TODO FRAME (OBJ_GAME_CONTROL, FORA DA PAUSA): CONTA O TEMPO, SE APRESENTA E ESCREVE A FALA
+function gorz_atualizar()
+{
+	if(!GORZ_ATIVO or !modo_arcade() or modo_versus()) exit;
+	if(global.gorz_cd > 0) global.gorz_cd--;
+	gorz_queda_atualizar();
+	//APRESENTACAO (UMA VEZ POR PARTIDA). NORMALMENTE VEM DA CENA DA QUEDA; ISSO AQUI E SO UM PLANO B
+	if(!global.gorz_inicio and is_undefined(global.zq) and global.tempo_partida >= GORZ_INICIO_S)
+	{
+		global.gorz_inicio = true;
+		gorz_falar("inicio", true);
+	}
+	var _z = global.gorz;
+	if(is_undefined(_z)) exit;
+	gorz_placa_garantir();
+	_z.t++;
+	//A FAIXA PRECISA CHEGAR ANTES DE ELE COMEÇAR A ESCREVER
+	if(_z.t < 14) exit;
+	//MAQUINA DE ESCREVER COM UM BIP MALIGNO (GRAVE, UM A CADA 2 LETRAS)
+	if(_z.chars < _z.n)
+	{
+		var _antes = floor(_z.chars);
+		_z.chars = min(_z.chars + GORZ_VEL_TEXTO, _z.n);
+		var _depois = floor(_z.chars);
+		if(_depois > _antes and (_depois mod 2) == 0)
+		{
+			audio_play_sound(snd_menu_select_03, 1, false, .2, 0, .3 + random(.15));
+		}
+	}
+	if(_z.t > _z.dur)
+	{
+		if(_z.ev == "inicio") global.gorz_intro = false; //SUMIU: A PRIMEIRA PEÇA PODE NASCER
+		global.gorz = undefined;
+	}
+}
+
+//==================== DESENHO DO GORZ (GUI, TUDO EM PIXELS DA ROOM VEZES A ESCALA DA GUI) ====================
+
+//RECORTA UM SEGMENTO NO RETANGULO (0,0)-(XMAX,YMAX). DEVOLVE [X0, Y0, X1, Y1] OU UNDEFINED SE FICOU TUDO PRA FORA (LIANG-BARSKY)
+function gorz_recortar(_x0, _y0, _x1, _y1, _xmax, _ymax)
+{
+	var _dx = _x1 - _x0, _dy = _y1 - _y0, _t0 = 0, _t1 = 1;
+	var _p = [-_dx, _dx, -_dy, _dy];
+	var _q = [_x0, _xmax - _x0, _y0, _ymax - _y0];
+	for(var i = 0; i < 4; i++)
+	{
+		if(_p[i] == 0)
+		{
+			if(_q[i] < 0) return undefined;
+		}
+		else
+		{
+			var _r = _q[i] / _p[i];
+			if(_p[i] < 0) _t0 = max(_t0, _r);
+			else _t1 = min(_t1, _r);
+		}
+	}
+	if(_t0 >= _t1) return undefined;
+	return [_x0 + _t0 * _dx, _y0 + _t0 * _dy, _x0 + _t1 * _dx, _y0 + _t1 * _dy];
+}
+
+//POLIGONO PREENCHIDO COM OS PONTOS EM COORDENADAS DA FAIXA: [U, V] (U = PRA FRENTE NA DIAGONAL, V = PRA BAIXO DELA)
+function gorz_poligono(_ox, _oy, _th, _pts, _e, _cor, _a)
+{
+	var _ux = cos(_th), _uy = -sin(_th), _vx = sin(_th), _vy = cos(_th);
+	draw_primitive_begin(pr_trianglefan);
+	for(var i = 0; i < array_length(_pts); i++)
+	{
+		var _u = _pts[i][0], _v = _pts[i][1];
+		draw_vertex_color((_ox + _ux * _u + _vx * _v) * _e, (_oy + _uy * _u + _vy * _v) * _e, _cor, _a);
+	}
+	draw_primitive_end();
+}
+
+//LINHAS DE VELOCIDADE: RISCOS FINOS QUE CORREM NA DIAGONAL DA FAIXA (_FRENTE: DESENHA AS POUCAS QUE PASSAM POR CIMA DA FAIXA)
+function gorz_linhas(_e, _al, _t, _frente)
+{
+	var _th = degtorad(GORZ_ANG);
+	var _ux = cos(_th), _uy = -sin(_th), _vx = sin(_th), _vy = cos(_th);
+	var _ox = -60, _oy = 460;
+	draw_set_color(#8FC4B8);
+	for(var i = 0; i < GORZ_LINHAS_N; i++)
+	{
+		if(((i mod 4) == 0) != _frente) continue;
+		var _h1 = frac(sin(i * 12.9898) * 43758.5453);
+		var _h2 = frac(sin(i * 78.233) * 12345.6789);
+		var _h3 = frac(sin(i * 39.346) * 24634.6345);
+		var _vel = 5 + _h1 * 9;							//PX POR FRAME
+		var _w = -400 + _h2 * 430;						//AFASTAMENTO DA DIAGONAL (PRA CIMA = NEGATIVO)
+		var _cmp = 40 + _h3 * 110;						//COMPRIMENTO DO RISCO
+		var _s = ((_h1 * 777 + _t * _vel) mod 600) - 100;	//ONDE A PONTA DE TRAS ESTA NA DIAGONAL
+		var _x0 = _ox + _ux * _s + _vx * _w, _y0 = _oy + _uy * _s + _vy * _w;
+		var _seg = gorz_recortar(_x0, _y0, _x0 + _ux * _cmp, _y0 + _uy * _cmp, GORZ_LINHAS_X, 405);
+		if(is_undefined(_seg)) continue;
+		draw_set_alpha((_frente ? .3 : .2 + .35 * _h3) * _al);
+		draw_line_width(_seg[0] * _e, _seg[1] * _e, _seg[2] * _e, _seg[3] * _e, (_h1 > .6 ? 2 : 1) * _e);
+	}
+	draw_set_alpha(1);
+}
+
+//CRIA (OU RECRIA, SE O WINDOWS PERDEU) AS SURFACES DA PLACA "COM... GORZ": O RETANGULO DA SPRITE ONDE ELA FICA, SEM NENHUM PIXEL DA CABEÇA
+function gorz_placa_garantir()
+{
+	var _n = sprite_get_number(spr_gorz);
+	if(array_length(global.gorz_placa) != _n) global.gorz_placa = array_create(_n, -1);
+	for(var i = 0; i < _n; i++)
+	{
+		if(global.gorz_placa[i] != -1 and surface_exists(global.gorz_placa[i])) continue;
+		var _s = surface_create(46, 28);
+		surface_set_target(_s);
+		draw_clear_alpha(c_black, 0);
+		draw_sprite_part(spr_gorz, i, 60, 58, 35, 9, 11, 1);	//O "COM..." (A CABEÇA AINDA ENTRA ATE X = 60 NESSAS LINHAS)
+		draw_sprite_part(spr_gorz, i, 49, 67, 46, 18, 0, 10);	//A CAIXA ESCURA COM O NOME
+		surface_reset_target();
+		global.gorz_placa[i] = _s;
+	}
+}
+
+//A CABEÇA (SPR_GORZ SEM A PLACA "COM... GORZ" QUE VEM NO DESENHO: A PLACA E REFEITA EM TEXTO, GIRADA NA FAIXA). TRES PEDAÇOS DA SPRITE, ESTICADOS JUNTOS
+//(_X, _Y) = CANTO DA SPRITE. _SQ = ESTICA/ACHATA (+ ESTICA PRA CIMA). _COR = TINTA
+function gorz_cabeca(_x, _y, _e, _s, _sq, _cor, _a)
+{
+	var _i = floor(current_time / 90) mod sprite_get_number(spr_gorz);
+	var _px = 50, _py = 83;													//PIVO (A PONTA DE BAIXO DA CABEÇA)
+	var _sx = _s * (1 - _sq), _sy = _s * (1 + _sq);
+	var _ax = _x + _px * _s, _ay = _y + _py * _s;
+	var _partes = [[0, 0, 100, 58], [0, 58, 60, 9], [0, 67, 49, 33]];
+	for(var k = 0; k < 3; k++)
+	{
+		var _p = _partes[k];
+		draw_sprite_part_ext(spr_gorz, _i, _p[0], _p[1], _p[2], _p[3], (_ax + (_p[0] - _px) * _sx) * _e, (_ay + (_p[1] - _py) * _sy) * _e, _sx * _e, _sy * _e, _cor, _a);
+	}
+}
+
+function gorz_desenhar()
+{
+	var _z = global.gorz;
+	if(is_undefined(_z) or !sprite_exists(spr_gorz)) exit;
+	var _e = gui_esc();
+	var _t = _z.t;
+	//ENTRADA (PASSA UM POUCO DO LUGAR E VOLTA) E SAIDA (ESCORREGA PRA FORA)
+	var _kin = clamp(_t / 22, 0, 1);
+	var _kout = clamp((_z.dur - _t) / 14, 0, 1);
+	var _c1 = 1.70158, _c3 = _c1 + 1;
+	var _in = 1 + _c3 * power(_kin - 1, 3) + _c1 * power(_kin - 1, 2);
+	var _out = 1 - power(1 - _kout, 2);
+	var _fora = 1 - _in * _out;				//1 = ESCONDIDO, 0 = NO LUGAR
+	var _al = clamp(_kin * 3, 0, 1) * _kout;
+	var _th = degtorad(GORZ_ANG);
+	var _ux = cos(_th), _uy = -sin(_th), _vx = sin(_th), _vy = cos(_th);
+	var _falando = _z.chars < _z.n;
+
+	//LINHAS DE VELOCIDADE POR TRAS DE TUDO
+	gorz_linhas(_e, _al, _t, false);
+
+	//CABEÇA: ENTRA PELO CANTO, BALANÇA SEMPRE UM POUCO, TREME QUANDO FALA / RI E PISCA VERMELHA QUANDO ESTA IRRITADO
+	var _hx = 30 - _fora * 190, _hy = 198 + _fora * 80 + sin(current_time / 260) * 2;
+	var _sq = _falando ? .05 * sin(_t * .9) : .025 * sin(current_time / 300);
+	if(_z.cara == 1) { _hx += random_range(-1, 1); _hy += random_range(-.8, .8); _sq += .03 * sin(_t * 1.3); }
+	var _cor = _z.cara == 2 ? merge_color(c_white, #FF6A58, .35 + .35 * sin(_t * .5)) : c_white;
+	gorz_cabeca(_hx, _hy, _e, GORZ_ESC_CABECA, _sq, _cor, _al);
+
+	//FAIXA ESCURA INCLINADA: VEM DE BAIXO ESQUERDA ANDANDO NA PROPRIA DIAGONAL (A ENTRADA PASSA UM POUCO E VOLTA)
+	var _ox = 34 - _ux * _fora * 280, _oy = 340 - _uy * _fora * 280;
+	var _L = GORZ_FAIXA_C, _T = GORZ_FAIXA_ESP;
+	var _escuro = #122020;	//A MESMA COR DA CAIXA DO NOME NA SPRITE
+	var _faixa = [[0, 0], [_L, 0], [_L - 14, _T], [14, _T]];
+	gorz_poligono(_ox, _oy, _th, _faixa, _e, _escuro, .93 * _al);
+	//LUZ NAS BORDAS (CIMA E BAIXO) PRA FAIXA NAO SUMIR NO FUNDO ESCURO
+	draw_set_alpha(.85 * _al);
+	draw_set_color(#3E7D70);
+	draw_line_width((_ox) * _e, (_oy) * _e, (_ox + _ux * _L) * _e, (_oy + _uy * _L) * _e, _e);
+	draw_line_width((_ox + _ux * 14 + _vx * _T) * _e, (_oy + _uy * 14 + _vy * _T) * _e, (_ox + _ux * (_L - 14) + _vx * _T) * _e, (_oy + _uy * (_L - 14) + _vy * _T) * _e, _e);
+	draw_set_alpha(1);
+	//CLARAO NA CHEGADA
+	if(_t < 9) gorz_poligono(_ox, _oy, _th, _faixa, _e, c_white, .55 * (1 - _t / 9));
+
+	//PLACA "COM... GORZ" DA PROPRIA SPRITE (SURFACE), GIRADA NA FAIXA. O NOME PISCA UMA LETRA POR VEZ E OS PONTINHOS ANDAM, IGUAL AO DESENHO ORIGINAL
+	draw_set_font(fnt_hud);
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	var _sombra = #06100D;
+	var _ip = floor(current_time / 90) mod sprite_get_number(spr_gorz);
+	if(array_length(global.gorz_placa) > _ip and surface_exists(global.gorz_placa[_ip]))
+	{
+		var _pu = 104, _pv = -40;	//CANTO DE CIMA ESQUERDO DA PLACA NA FAIXA (A BASE DELA ENCOSTA NO TOPO DA FAIXA)
+		var _filtro = gpu_get_texfilter();
+		gpu_set_texfilter(false);
+		draw_surface_ext(global.gorz_placa[_ip], (_ox + _ux * _pu + _vx * _pv) * _e, (_oy + _uy * _pu + _vy * _pv) * _e, _e * 1.5, _e * 1.5, GORZ_ANG, c_white, _al);
+		gpu_set_texfilter(_filtro);
+	}
+
+	//A FRASE: LETRA POR LETRA (MAQUINA DE ESCREVER), CADA UMA "ESTOURA" AO NASCER. AS PALAVRAS MARCADAS TEM COR E ANIMAÇAO PROPRIA
+	var _tx = _ox + _ux * 16 + _vx * ((_T - _z.alt) / 2), _ty = _oy + _uy * 16 + _vy * ((_T - _z.alt) / 2);
+	var _glitch = "#%&@?!*$";
+	for(var i = 0; i < _z.n; i++)
+	{
+		var _ch = _z.ch[i];
+		var _idade = _z.chars - i;
+		if(_idade <= 0) break;
+		var _pop = clamp(1 - _idade / 6, 0, 1);
+		var _lu = _ch.u, _lv = _ch.v - _pop * 4;
+		var _sc = _ch.s * (1 + _pop * .7), _scy = _sc;
+		var _c = _ch.c, _cc = c_white, _w = _t * 1.0;
+		switch(_ch.st)
+		{
+			case "r":	//VERMELHO: TREME E PULSA
+				_cc = merge_color(#FF1F3A, #FF7060, .5 + .5 * sin(_w * .25 + i));
+				_lu += random_range(-.6, .6); _lv += random_range(-.6, .6);
+				_sc *= 1 + .08 * sin(_w * .3); _scy = _sc;
+				break;
+			case "y":	//AMARELO: ONDULA
+				_cc = merge_color(#FFE600, #FF9A00, .5 + .5 * sin(_w * .2 + i * .5));
+				_lv += sin(_w * .18 + i * .7) * 2.2;
+				break;
+			case "c":	//CIANO: TREME DE FRIO
+				_cc = merge_color(#31FCFF, c_white, .5 + .5 * sin(_w * .4 + i));
+				_lu += choose(-.5, 0, .5); _lv += choose(-.4, 0, .4);
+				break;
+			case "o":	//LARANJA: FOGO (ALTURA PISCANDO E COR ENTRE LARANJA E AMARELO)
+				_cc = merge_color(#FF5A00, #FFD21F, .5 + .5 * sin(_w * .5 + i * 1.7));
+				_scy = _sc * (1 + .18 * sin(_w * .45 + i * 2.3));
+				_lv -= (_scy - _sc) * 4;
+				break;
+			case "g":	//VERDE: GLITCH (DE VEZ EM QUANDO A LETRA VIRA UM SIMBOLO E PULA)
+				_cc = #7CFF3A;
+				if(((floor(_w / 3) + i * 7) mod 23) == 0) { _c = string_char_at(_glitch, 1 + ((floor(_w / 3) + i) mod string_length(_glitch))); _lu += random_range(-1.5, 1.5); _cc = c_white; }
+				break;
+			case "m":	//ARCO-IRIS: A COR GIRA E A LETRA ONDULA
+				_cc = make_color_hsv((_w * 4 + i * 25) mod 256, 200, 255);
+				_lv += sin(_w * .2 + i * .6) * 1.8;
+				break;
+		}
+		//O ESTOURO NASCE BRANCO E ASSENTA NA COR DA PALAVRA
+		_cc = merge_color(_cc, c_white, _pop);
+		var _px = _tx + _ux * _lu + _vx * _lv, _py = _ty + _uy * _lu + _vy * _lv;
+		var _cb = merge_color(_cc, c_black, .22);
+		draw_text_transformed_color((_px + .8) * _e, (_py + 1) * _e, _c, _e * _sc, _e * _scy, GORZ_ANG, _sombra, _sombra, _sombra, _sombra, _al);
+		draw_text_transformed_color(_px * _e, _py * _e, _c, _e * _sc, _e * _scy, GORZ_ANG, _cc, _cc, _cb, _cb, _al);
+	}
+
+	//ALGUMAS LINHAS DE VELOCIDADE PASSAM POR CIMA DE TUDO
+	gorz_linhas(_e, _al, _t, true);
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	draw_set_color(c_white);
+	draw_set_alpha(1);
+}
+
+
+//==================== A ABERTURA DA PARTIDA: O PERSONAGEM CAI E O GORZ APARECE NO PULINHO ====================
+//0) O PERSONAGEM CAI DO CEU. 1) BATE NO CHAO E FICA ESMAGADINHO UM INSTANTE. 2) DA UM PULINHO E NESSA HORA O GORZ APARECE E FALA.
+//QUANDO POUSA DE NOVO O CONTROLE VOLTA. A PRIMEIRA PEÇA SO NASCE DEPOIS QUE O GORZ SOME (GORZ_SEGURANDO).
+function gorz_queda_atualizar()
+{
+	var _q = global.zq;
+	if(is_undefined(_q)) exit;
+	var _p = player_n(1);
+	if(_p == noone) exit;
+	_q.t++;
+	global.gorz_trava = true;
+	//TRAVA DE SEGURANÇA: SE ALGO DER ERRADO A CENA ACABA SOZINHA
+	if(_q.t > room_speed * 8)
+	{
+		global.gorz_trava = false;
+		global.zq = undefined;
+		if(!global.gorz_inicio) { global.gorz_inicio = true; gorz_falar("inicio", true); }
+		exit;
+	}
+	switch(_q.sub)
+	{
+		//CAINDO: NO PRIMEIRO FRAME SOBE TODO MUNDO PRA FORA DA TELA
+		case 0:
+			if(_q.t == 1)
+			{
+				with(obj_player)
+				{
+					if(player_e_fantasma(id)) continue;
+					y = -40;
+					velh = 0;
+					velv = 0;
+					estado = state.jump;
+				}
+			}
+			//BATEU NO CHAO
+			if(_q.t > 10 and _p.solido(_p.x, _p.y + 1))
+			{
+				_q.sub = 1;
+				_q.t = 0;
+				with(obj_player)
+				{
+					velh = 0;
+					velv = 0;
+					poeira(x, y, 10);
+					onda_choque(x, y - 8, 60, 5, 24);
+				}
+				shakes(10, 3);
+				audio_play_sound(snd_hit2, 1, false, 1, 0, .6);
+				audio_play_sound(snd_player_morte, 1, false, .4, 0, 1.6);
+			}
+			break;
+
+		//ESMAGADINHO: FICA ACHATADO UM INSTANTE E DA O PULINHO (AI O GORZ APARECE)
+		case 1:
+			with(obj_player)
+			{
+				velh = 0;
+				esc_x = 1.8 * sign(image_xscale);
+				esc_y = .3;
+			}
+			if(_q.t > room_speed * .7)
+			{
+				_q.sub = 2;
+				_q.t = 0;
+				with(obj_player)
+				{
+					velv = -2.8;
+					estado = state.jump;
+					esc_x = .7 * sign(image_xscale);
+					esc_y = 1.4;
+				}
+				audio_play_sound(snd_boing, 1, false, .9, 0, 1.3);
+				global.gorz_inicio = true;
+				gorz_falar("inicio", true);
+			}
+			break;
+
+		//PULINHO: QUANDO POUSA DE NOVO O CONTROLE VOLTA (O GORZ CONTINUA FALANDO)
+		case 2:
+			if(_q.t > 8 and _p.solido(_p.x, _p.y + 1) and _p.velv >= 0)
+			{
+				global.gorz_trava = false;
+				global.zq = undefined;
+			}
+			break;
+	}
+}

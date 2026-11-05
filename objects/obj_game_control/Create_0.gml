@@ -138,6 +138,9 @@ voltar_menu = function()
 if(modo_arcade()) habil_zerar();
 min_aviso = floor(global.tempo_partida / 60);	//ULTIMO MINUTO DE PARTIDA QUE JA AVISOU "PEÇAS MAIS RAPIDAS"
 
+//GORZ, O ALIEN QUE CONTROLA A GRADE (SCR_PODERES): ZERA O ESTADO DELE NA PARTIDA
+gorz_iniciar();
+
 //COOP: A VEZ DO TELEPORTE COMEÇA NO PLAYER 1
 coop_vez_reiniciar();
 

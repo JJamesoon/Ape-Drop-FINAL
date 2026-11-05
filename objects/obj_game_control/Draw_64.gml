@@ -391,6 +391,9 @@ guia_linha_desenhar();
 //TIRA DE COMANDOS NO RODAPE (SCR_PODERES): AS TECLAS PASSAM DEVAGAR, CLARAS ATE O JOGADOR USAR, DEPOIS FICAM COM ALPHA .5
 teclas_desenhar();
 
+//GORZ (SCR_PODERES): NO JOGO NORMAL DESENHA AQUI (DEPOIS A TELA DE PAUSA/RESULTADO SAI CEDO). COM PAUSA/RESULTADO ELE DESENHA NO FIM, POR CIMA
+if(alpha_pause < .01 and alpha_fim < .01) gorz_desenhar();
+
 //TELA DE PAUSA E DE RESULTADO (GAME OVER)
 //TUDO E POSICIONADO EM "PIXELS DA ROOM" E MULTIPLICADO POR _E, PORQUE A GUI E MAIOR QUE A ROOM
 if(alpha_pause < .01 and alpha_fim < .01) exit;
@@ -551,6 +554,9 @@ else
 	if(!ver_comandos) draw_text_ext_transformed_color(_cx * _e, (_y + 6) * _e, texto("dica_especial"), 12, _pw - 30, _e * .7, _e * .7, 0, c_aqua, c_aqua, c_aqua, c_aqua, _a);
 	#endregion
 }
+
+//GORZ: A FALA NA TELA (SCR_PODERES). POR CIMA DE TUDO, ATE DA TELA DE RESULTADO
+gorz_desenhar();
 
 //VOLTA O PADRAO DE DESENHO
 draw_set_alpha(1);

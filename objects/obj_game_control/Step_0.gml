@@ -15,6 +15,9 @@ var _down	= keyboard_check_pressed(ord("S")) or keyboard_check_pressed(vk_down);
 var _enter	= keyboard_check_pressed(vk_space) or keyboard_check_pressed(vk_enter) or (MOBILE and keyboard_check_pressed(global.imputs.soco));
 var _voltar	= keyboard_check_pressed(vk_escape);
 
+//GORZ: A FALA NA TELA (SCR_PODERES)
+if(!pausado and !menu_poder) gorz_atualizar();
+
 #region FIM DE JOGO (TELA DE RESULTADO)
 if(_player_morto and !fim_jogo)
 {
@@ -24,6 +27,7 @@ if(_player_morto and !fim_jogo)
 	{
 		fim_jogo = true;
 		if(modo_versus() and !global.vs_contou and global.vs_perdedor > 0) { global.vs_contou = true; global.vs_vitorias[2 - global.vs_perdedor]++; } //VERSUS: UMA VITORIA PRA QUEM FICOU
+		gorz_falar("morte", true);
 		recorde_checar();
 		novo_recorde = recorde_atual() > recorde_inicio and global.pontos_1 > 0;
 		jogo_salvar();
@@ -199,6 +203,7 @@ if(!menu_poder and !pausado and !_player_morto and modo_arcade() and !modo_versu
 	if(!palavra_festejada)
 	{
 		palavra_festejada = true;
+		gorz_falar("palavra");
 		global.palavra_festa = PALAVRA_FESTA;
 		shakes(6, 2);
 		with(obj_borda) onda_choque(x + dx_hud + 212, y + 215, 70, 5, 30);
@@ -368,6 +373,7 @@ if(modo_arcade() and !modo_versus() and !instance_exists(obj_onda_laser))
 	{
 		laser_proxima = LASER_ONDA_INTERVALO;
 		instance_create_depth(0, 0, -2050, obj_onda_laser);
+		gorz_falar("laser");
 	}
 }
 
@@ -399,7 +405,7 @@ if(instance_exists(obj_area))
 	
 	//PERIGO: TEM BLOCO PARADO NAS 4 LINHAS DE CIMA DA ARENA
 	global.perigo = _mais_alto < obj_area.y + CEL * 4;
-	if(global.perigo and !_antes) som_tocar(snd_menu_erro_03);
+	if(global.perigo and !_antes) { som_tocar(snd_menu_erro_03); gorz_falar("perigo"); }
 	
 	//ALTURA DA PILHA (0 VAZIA, 1 NO TOPO): A MUSICA ACELERA CONFORME ELA SOBE
 	global.altura_pilha = (_fundo - _mais_alto) / obj_area.sprite_height;

@@ -16,8 +16,8 @@ var _lento = function(_col, _row) { var _l = criar_bloco_solto(288 + 16 * _col, 
 //NENHUMA PEÇA DO TESTE SORTEIA TIPO ESPECIAL
 if(etapa != "consistencia") with(obj_peca) if(alarm[1] > 0) alarm[1] = -1;
 
-//PRIMEIRO FRAME: PARA DE NASCER PEÇA, ONDA, LETRA E LASER E TIRA O PLAYER DO CAMINHO
-if(timer == 1)
+//(A ETAPA gorz_natural DEIXA O JOGO ABRIR SOZINHO, SEM MEXER EM NADA)
+if(timer == 1 and etapa != "gorz_natural")
 {
 	with(obj_area) alarm[0] = 99999;
 	with(obj_game_control) { onda_proxima = 99999; letra_timer = 99999; laser_proxima = 99999; }
@@ -25,7 +25,7 @@ if(timer == 1)
 	etapa = "pausa_coop";
 	marca = timer;
 }
-global.tempo_partida = 30; //SEM DESAFIO NO MEIO DO TESTE
+if(etapa != "gorz_natural") global.tempo_partida = 30; //SEM DESAFIO NO MEIO DO TESTE
 
 switch(etapa)
 {
@@ -88,6 +88,41 @@ switch(etapa)
 		if(_t == 12) screen_save("teste_b1_brilho_p1.png");
 		if(_t == 13) global.coop_vez = 2;
 		if(_t == 20) { screen_save("teste_b2_brilho_p2.png"); log("FIM"); game_end(); }
+		break;
+	#endregion
+
+	#region GORZ (FAIXA, CABEÇA, LINHAS E TEXTO ANIMADO)
+	case "gorz":
+		if(_t == 2)
+		{
+			if(room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+			_limpar(); _player(-200, 100);
+			global.zq = undefined; global.gorz_trava = false; global.gorz_intro = false;
+		}
+		if(_t == 4) { gorz_falar("inicio", true); log("gorz falando=" + string(!is_undefined(global.gorz)) + " letras=" + string(is_undefined(global.gorz) ? -1 : global.gorz.n)); }
+		if(_t == 12) screen_save("teste_g1_entrando.png");
+		if(_t == 40) screen_save("teste_g2_escrevendo.png");
+		if(_t == 90) screen_save("teste_g3_completo.png");
+		if(_t == 120) { global.gorz = undefined; global.gorz_cd = 0; gorz_falar("laser", true); }
+		if(_t == 190) screen_save("teste_g4_laser.png");
+		if(_t == 200) { global.gorz = undefined; global.gorz_cd = 0; gorz_falar("frio", true); }
+		if(_t == 280) screen_save("teste_g5_frio.png");
+		if(_t == 285) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
+	#region GORZ: ABERTURA NATURAL (QUEDA, FALA, PRIMEIRA PEÇA SO DEPOIS)
+	case "gorz_natural":
+		if(_t == 2 and room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+		//O TESTE TIRA OS PLAYERS DE CENA NO COMEÇO (X = -200): VOLTA ELES PRO CENTRO DA ARENA E RECOMEÇA A ABERTURA
+		if(_t == 3) { var _k = 0; with(obj_player) { x = obj_area.x + 100 + 90 * _k; y = obj_area.y + 200; velh = 0; velv = 0; _k++; } gorz_iniciar(); }
+		if(_t == 20 or _t == 60 or _t == 120 or _t == 200 or _t == 320 or _t == 420)
+		{
+			log("t=" + string(_t) + " zq=" + string(!is_undefined(global.zq)) + " gorz=" + string(!is_undefined(global.gorz)) + " segurando=" + string(gorz_segurando()) + " pecas=" + string(instance_number(obj_peca)) + " trava=" + string(global.gorz_trava) + " sub=" + string(is_undefined(global.zq) ? -1 : global.zq.sub) + " qt=" + string(is_undefined(global.zq) ? -1 : global.zq.t) + " p1y=" + string(player_n(1) == noone ? -999 : player_n(1).y) + " p1estado=" + string(player_n(1) == noone ? -1 : player_n(1).estado) + " coop=" + string(global.coop) + " room=" + room_get_name(room) + " tp=" + string(global.tempo_partida) + " fantasma=" + string(player_n(1) == noone ? -1 : player_e_fantasma(player_n(1))) + " p1x=" + string(player_n(1).x) + " blocos=" + string(instance_number(obj_block)) + " solido=" + string(player_n(1).solido(player_n(1).x, player_n(1).y + 1)) + " velv=" + string(player_n(1).velv) + " p2y=" + string(player_n(2) == noone ? -1 : player_n(2).y) + " area=" + string(obj_area.x) + "," + string(obj_area.y) + "," + string(obj_area.sprite_height));
+		}
+		if(_t == 90) screen_save("teste_n1_queda.png");
+		if(_t == 160) screen_save("teste_n2_fala.png");
+		if(_t == 440) { log("FIM"); game_end(); }
 		break;
 	#endregion
 

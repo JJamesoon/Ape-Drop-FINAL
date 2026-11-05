@@ -290,6 +290,7 @@
     {"id":{"name":"spr_efeito_bloco_irmandade","path":"sprites/spr_efeito_bloco_irmandade/spr_efeito_bloco_irmandade.yy",},},
     {"id":{"name":"spr_efeito_bloco","path":"sprites/spr_efeito_bloco/spr_efeito_bloco.yy",},},
     {"id":{"name":"spr_efeito_brilho","path":"sprites/spr_efeito_brilho/spr_efeito_brilho.yy",},},
+    {"id":{"name":"spr_gorz","path":"sprites/spr_gorz/spr_gorz.yy",},},
     {"id":{"name":"spr_efeito_destroi_block","path":"sprites/spr_efeito_destroi_block/spr_efeito_destroi_block.yy",},},
     {"id":{"name":"spr_efeito_line_2","path":"sprites/spr_efeito_line_2/spr_efeito_line_2.yy",},},
     {"id":{"name":"spr_efeito_line_combo","path":"sprites/spr_efeito_line_combo/spr_efeito_line_combo.yy",},},

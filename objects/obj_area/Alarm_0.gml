@@ -1,3 +1,7 @@
+//GORZ ABRE A PARTIDA (SCR_PODERES): A PRIMEIRA PEÇA ESPERA ELE FALAR E SUMIR
+if(gorz_segurando()) { alarm[0] = 5; exit; }
+
+
 //CRIA A PROXIMA PEÇA E MARCA QUANDO VEM A SEGUINTE
 criar_bloco();
 alarm[0] = peca_tempo_criar(); //FICA MAIS RAPIDO A CADA LEVEL, A CADA ANDAR E COM O TEMPO
