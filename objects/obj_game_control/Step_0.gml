@@ -420,7 +420,6 @@ else if(global.coop)
 {
 	//COOP: OS DOIS TELEPORTAM, UM DE CADA VEZ (SCR_COOP)
 	if(global.coop_vez_aviso > 0) global.coop_vez_aviso--;
-	global.coop_vez_pop = max(0, global.coop_vez_pop - .06);
 	for(var _n = 1; _n <= 2; _n++) if(keyboard_check_pressed(imputs_jogador(_n).acelerar)) coop_teleporte(_n);
 }
 else if(keyboard_check_pressed(global.imputs.acelerar))

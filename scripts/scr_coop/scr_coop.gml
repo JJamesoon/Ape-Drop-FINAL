@@ -47,16 +47,14 @@ function todos_mortos()
 
 //==================== COOP: TELEPORTE DA PEÇA, UM DE CADA VEZ ====================
 //OS DOIS JOGADORES PODEM TELEPORTAR A PEÇA ATUAL, MAS NA VEZ: QUEM TELEPORTOU PASSA A VEZ PRO OUTRO. SE O DONO DA VEZ ESTA MORTO,
-//O OUTRO TELEPORTA NO LUGAR DELE. DE QUEM E A VEZ APARECE NA CAIXA DO JOGADOR (PISCA NA COR DELE) E EM CIMA DA PEÇA ATUAL (ETIQUETA P1/P2)
+//O OUTRO TELEPORTA NO LUGAR DELE. DE QUEM E A VEZ APARECE NA CAIXA DO JOGADOR (PISCA NA COR DELE) E NO BRILHO DA PEÇA ATUAL (A COR DELE)
 global.coop_vez			= 1;	//DE QUEM E A VEZ (1 OU 2)
-global.coop_vez_pop		= 0;	//1 A 0: PULINHO DA ETIQUETA QUANDO A VEZ TROCA
 global.coop_vez_aviso	= 0;	//FRAMES ATE PODER AVISAR DE NOVO "NAO E A SUA VEZ"
 
 //COMEÇOU UMA PARTIDA: A VEZ COMEÇA NO PLAYER 1
 function coop_vez_reiniciar()
 {
 	global.coop_vez = 1;
-	global.coop_vez_pop = 0;
 	global.coop_vez_aviso = 0;
 }
 
@@ -92,45 +90,12 @@ function coop_teleporte(_n)
 	teleporte_acionar();
 	habil_aprender("teleporte");
 	global.coop_vez = 3 - _n;
-	global.coop_vez_pop = 1;
 }
 
-//ETIQUETA "P1"/"P2" EM CIMA DA PEÇA ATUAL (A QUE TELEPORTA), NA COR DE QUEM TEM A VEZ. DESENHADA NA GUI (POR CIMA DE TUDO)
-function coop_vez_desenhar()
+//COR DO BRILHO DA PEÇA ATUAL NO COOP: A COR DE QUEM TEM A VEZ DO TELEPORTE (P1 AMARELO, P2 CIANO)
+function coop_vez_cor()
 {
-	if(!global.coop or modo_versus() or MOBILE or !instance_exists(global.peca_inst)) exit;
-	//TOPO E MEIO DA PEÇA ATUAL (TODOS OS BLOCOS DELA)
-	var _topo = infinity, _x1 = infinity, _x2 = -infinity, _alvo = global.peca_inst;
-	with(obj_peca) if(pai == _alvo and destruido_por == noone)
-	{
-		_topo = min(_topo, bbox_top);
-		_x1 = min(_x1, bbox_left);
-		_x2 = max(_x2, bbox_right);
-	}
-	if(_topo == infinity) exit;
-	var _e = gui_esc();
-	var _n = coop_vez_de();
-	var _cor = _n == 1 ? COOP_COR_P1 : COOP_COR_P2;
-	var _txt = "P" + string(_n);
-	var _pop = global.coop_vez_pop;
-	var _bob = sin(current_time / 170) * 1.5;
-	var _cx = (_x1 + _x2) / 2;
-	var _w = 11 + 3 * _pop, _h = 8 + 2 * _pop;
-	var _cy = max(_topo - 11 + _bob, _h + 2);	//SE A PEÇA TA NO TOPO DA TELA A ETIQUETA ENCOSTA NO ALTO
-	draw_set_font(fnt_hud);
-	draw_set_halign(fa_center);
-	draw_set_valign(fa_middle);
-	//SETINHA PRA BAIXO, FUNDO ESCURO COM CONTORNO NA COR DO JOGADOR E O TEXTO
-	draw_set_color(_cor);
-	draw_triangle((_cx - 3) * _e, (_cy + _h - 1) * _e, (_cx + 3) * _e, (_cy + _h - 1) * _e, _cx * _e, (_cy + _h + 4) * _e, false);
-	draw_set_color(#0E071B);
-	draw_rectangle((_cx - _w) * _e, (_cy - _h) * _e, (_cx + _w) * _e, (_cy + _h) * _e, false);
-	draw_set_color(_cor);
-	draw_rectangle((_cx - _w) * _e, (_cy - _h) * _e, (_cx + _w) * _e, (_cy + _h) * _e, true);
-	draw_text_transformed_color(_cx * _e, (_cy + 1) * _e, _txt, _e * .7, _e * .7, 0, _cor, _cor, _cor, _cor, 1);
-	draw_set_halign(fa_left);
-	draw_set_valign(fa_top);
-	draw_set_color(c_white);
+	return coop_vez_de() == 1 ? COOP_COR_P1 : COOP_COR_P2;
 }
 
 //ALGUM PLAYER VIVO TA SEM A VIDA CHEIA? (O BLOCO ESPECIAL SO SORTEIA +1 VIDA SE TIVER)
@@ -1706,7 +1671,7 @@ function coop_faixa_desenhar(_x, _y, _dados)
 	draw_set_font(fnt_mini_hud);
 	draw_set_halign(fa_center);
 	draw_set_valign(fa_middle);
-	var _vals = [[_x + 49, _y + 24, string(global.level)], [_x + 123, _y + 21, _dados.hi], [_x + 197, _y + 24, _dados.tempo]];
+	var _vals = [[_x + 49, _y + 22, string(global.level)], [_x + 123, _y + 19, _dados.hi], [_x + 197, _y + 22, _dados.tempo]];
 	for(var i = 0; i < 3; i++)
 	{
 		draw_text_transformed_color(_vals[i][0] + 1, _vals[i][1] + 1, _vals[i][2], 1, 1, 0, _sombra, _sombra, _sombra, _sombra, 1);

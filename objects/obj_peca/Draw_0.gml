@@ -287,7 +287,12 @@ _cor = c_white;
 	
 	//PEÇA ATUAL DA FILA (A QUE TELEPORTA): BRILHO EM VOLTA
 	//CHECANDD SE O NOSSO PAI E O INST_PECA
-	if(room == rm_versus ? versus_peca_atual(pai) : pai == global.peca_inst) draw_sprite_ext(spr_efeito_brilho, get_timer()/50000, x + shake_x, y + shake_y, 1, 1, 0, c_white, 1);	//(A ARTE NOVA DO BRILHO TEM O RISCO 3PX MAIS PRA DIREITA NO QUADRO: O -3 CENTRA NA FACE DO BLOCO)
+	if(room == rm_versus ? versus_peca_atual(pai) : pai == global.peca_inst)
+	{
+		//NO COOP O BRILHO TEM A COR DE QUEM TEM A VEZ DO TELEPORTE. NO SOLO E BRANCO
+		var _cor_brilho = (global.coop and room != rm_versus and !MOBILE) ? coop_vez_cor() : c_white;
+		draw_sprite_ext(spr_efeito_brilho, get_timer()/50000, x + shake_x, y + shake_y, 1, 1, 0, _cor_brilho, 1);
+	}	//(A ARTE NOVA DO BRILHO TEM O RISCO 3PX MAIS PRA DIREITA NO QUADRO: O -3 CENTRA NA FACE DO BLOCO)
 	//ANIMAÇAO DE QUEBRAR A IRMANDADE
 	if(anim_efeito_irmandade)
 	{

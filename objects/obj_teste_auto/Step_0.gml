@@ -72,6 +72,25 @@ switch(etapa)
 		break;
 	#endregion
 
+	#region BRILHO DA PEÇA ATUAL NA COR DE QUEM TEM A VEZ (COOP)
+	case "brilho":
+		if(_t == 2)
+		{
+			if(room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+			_limpar(); _player(-200, 100);
+		}
+		if(_t == 5 or _t == 6)
+		{
+			global.prox_tipo = tipo_peca.O; global.prox_especie = "normal"; global.prox_fantasmas = 0; global.prox_gelo = false; global.prox_cor = _t == 5 ? cores.c_green : cores.c_red;
+			var _c = instance_create_layer(obj_area.x + 8 + 16 * (_t == 5 ? 3 : 8), obj_area.y + 8 + 8, "Linha", obj_cria_peca);
+			with(_c) event_perform(ev_alarm, 0);
+		}
+		if(_t == 12) screen_save("teste_b1_brilho_p1.png");
+		if(_t == 13) global.coop_vez = 2;
+		if(_t == 20) { screen_save("teste_b2_brilho_p2.png"); log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
 	case "jcoop":
 		if(_t == 2)
