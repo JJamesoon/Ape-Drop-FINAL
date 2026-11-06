@@ -203,9 +203,9 @@ function borda_desenhar(_spr, _frame, _x, _y, _extra, _alpha = 1)
 #macro VS_QUEDA_FIM			.27		//...E NO FIM DA RAMPA
 #macro VS_RAMPA_S			200		//SEGUNDOS ATE O FIM DA RAMPA
 #macro VS_COMBO_TEMPO		(room_speed * 4)	//TEMPO PRA EMENDAR OUTRA LINHA NO COMBO DA ZONA
-#macro VS_MAX_ATAQUES		5		//ATAQUES PENDENTES NA FILA DE QUEM RECEBE (O RESTO E IGNORADO)
-#macro VS_COR_P1			#FF5A78
-#macro VS_COR_P2			#4AB4FF
+#macro VS_MAX_ATAQUES		4		//ATAQUES PENDENTES NA FILA DE QUEM RECEBE (O RESTO E IGNORADO)
+#macro VS_COR_P1			#4D7CFF		//AZUL (O LADO ESQUERDO)
+#macro VS_COR_P2			#FF553A		//VERMELHO (O LADO DIREITO)
 
 global.vs_perdedor	= 0;		//0 NINGUEM PERDEU, 1 OU 2 = JOGADOR QUE PERDEU A RODADA
 global.vs_vitorias	= [0, 0];	//VITORIAS DA SESSAO (NAO ZERA QUANDO REINICIA: REVANCHE)
@@ -310,7 +310,7 @@ function versus_montar()
 		instance_create_layer(_zn.x - CEL, y, "Blocos", obj_parede);
 		instance_create_layer(_zn.x + VS_COLS * CEL, y, "Blocos", obj_parede);
 		//CHAO: UM BLOCO EMBAIXO DE CADA COLUNA (A ORIGEM DO OBJ_BLOCK E NO CENTRO)
-		for(var c = 0; c < VS_COLS; c++) instance_create_layer(_zn.x + CEL / 2 + CEL * c, y + sprite_height + CEL / 2, "Blocos", obj_block);
+		for(var c = 0; c < VS_COLS; c++) instance_create_layer(_zn.x + CEL / 2 + CEL * c, y + sprite_height + CEL / 2, "Blocos", obj_block, { visible : false });	//(O CHAO JA VEM NO DESENHO DA MOLDURA)
 		//O PLAYER NASCE NO MEIO DO CHAO DA ZONA
 		instance_create_layer(_zn.x + VS_COLS * CEL / 2, y + sprite_height, "Blocos", obj_player, { jogador : z + 1 });
 		versus_sortear(_zn);
@@ -714,28 +714,53 @@ function versus_cartao_desenhar(_z, _esq)
 {
 	var _zn = obj_area.zonas[_z];
 	var _n = _z + 1;
+	var _p1 = _n == 1;
 	var _cor = _z == 0 ? VS_COR_P1 : VS_COR_P2;
 	var _pt = global.linguagem == 0;
-	var _px = _esq ? 8 : room_width - 8 - 112;
-	var _py = obj_area.y;
-	var _w = 112, _h = 304;
+	var _x = _esq ? 7 : room_width - 7 - COOP_CAIXA_W;	//CANTO DA CAIXA VISIVEL (A SPRITE TEM UMA MARGEM TRANSPARENTE)
+	var _y = obj_area.y - 2;
 	var _sombra = #0E071B;
 	var _p = player_n(_n);
+	//A MESMA CAIXA DO COOP: FRAME 0 = P1 (CORAÇOES NA ESQUERDA), FRAME 1 = P2 (CORAÇOES NA DIREITA)
+	draw_sprite(spr_coop_caixa, _z, _x - COOP_CAIXA_OX, _y - COOP_CAIXA_OY);
 
-	//FUNDO DO CARTAO E FAIXA DO NOME
-	draw_set_alpha(.88);
-	draw_set_color(_sombra);
-	draw_rectangle(_px, _py, _px + _w, _py + _h, false);
-	draw_set_alpha(1);
-	draw_set_color(merge_color(_cor, c_white, .15));
-	draw_rectangle(_px, _py, _px + _w, _py + _h, true);
+	//CHEGOU UM ATAQUE: A CAIXA PISCA VERMELHO
+	if(_zn.aviso > 0)
+	{
+		draw_set_color(#FF5577);
+		draw_set_alpha(.4 + .6 * abs(sin(current_time / 90)));
+		draw_rectangle(_x - 1, _y - 1, _x + COOP_CAIXA_W, _y + COOP_CAIXA_H, true);
+		draw_rectangle(_x, _y, _x + COOP_CAIXA_W - 1, _y + COOP_CAIXA_H - 1, true);
+		draw_set_alpha(1);
+	}
+
+	//FAIXA DO NOME: TINGIDA NA COR DO JOGADOR (AZUL / VERMELHO)
 	draw_set_color(_cor);
-	draw_rectangle(_px + 1, _py + 1, _px + _w - 1, _py + 14, false);
+	draw_set_alpha(.45);
+	draw_rectangle(_x + 1, _y + 4, _x + 98, _y + 13, false);
+	draw_set_alpha(1);
 	draw_set_font(fnt_hud);
-	draw_set_halign(fa_center);
+	draw_set_halign(fa_left);
 	draw_set_valign(fa_middle);
-	draw_text_transformed_color(_px + _w / 2 + 1, _py + 8.5, (_pt ? "JOGADOR " : "PLAYER ") + string(_n), .6, .6, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_px + _w / 2, _py + 7.5, (_pt ? "JOGADOR " : "PLAYER ") + string(_n), .6, .6, 0, c_white, c_white, c_white, c_white, 1);
+	var _nome = (_pt ? "JOGADOR " : "PLAYER ") + string(_n);
+	draw_text_transformed_color(_x + 7, _y + 9.5, _nome, .55, .55, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_x + 6, _y + 8.5, _nome, .55, .55, 0, c_white, c_white, c_white, c_white, 1);
+
+	//ENERGIA DO ESPECIAL (COLUNA DE 4 QUADRADOS: P1 NA DIREITA, P2 NA ESQUERDA): SOBE DE BAIXO PRA CIMA
+	var _ex1 = _p1 ? _x + 80 : _x + 2, _ex2 = _p1 ? _x + 97 : _x + 19, _ebase = _y + 78, _ealt = 62;
+	var _etopo = _ebase - _ealt * clamp(_zn.energia / ENERGIA_MAX, 0, 1);
+	var _cheia = _zn.energia >= ENERGIA_MAX;
+	var _celulas = [[_y + 66, _y + 78], [_y + 49, _y + 62], [_y + 32, _y + 45], [_y + 16, _y + 28]];	//DE BAIXO PRA CIMA
+	for(var k = 0; k < 4; k++)
+	{
+		var _t = max(_celulas[k][0], _etopo);
+		if(_t < _celulas[k][1])
+		{
+			draw_set_alpha(_cheia ? .75 + .25 * sin(current_time / 150) : .9);
+			draw_rectangle_color(_ex1, _t, _ex2, _celulas[k][1], #31FCFF, #31FCFF, #1C6FD1, #1C6FD1, false);
+			draw_set_alpha(1);
+		}
+	}
 
 	//RETRATO: CARA DO MOMENTO (NORMAL, GRITA QUANDO ENVIA ATAQUE, MACHUCADO QUANDO RECEBE)
 	var _perfil = global.skins[_n == 2 ? global.skin_player_2 : global.skin_player_1].perfil;
@@ -744,91 +769,70 @@ function versus_cartao_desenhar(_z, _esq)
 	if(_zn.aviso > 0 or (_p != noone and _p.imune > 0)) _cara = 3;
 	if(_p != noone and _p.estado == state.morte) _cara = 3;
 	if(_cara == 0 and (current_time + _n * 1700) mod 3500 < 130) _cara = 2;
-	var _rx = _px + (_w - 52) / 2, _ry = _py + 20;
-	draw_set_color(#1E1A38);
-	draw_rectangle(_rx - 2, _ry - 2, _rx + 53, _ry + 61, false);
-	draw_sprite_part(_perfil, min(_cara, sprite_get_number(_perfil) - 1), 4, 0, 52, 60, _rx, _ry);
-	draw_set_color(_cor);
-	draw_rectangle(_rx - 2, _ry - 2, _rx + 53, _ry + 61, true);
+	draw_sprite_part(_perfil, min(_cara, sprite_get_number(_perfil) - 1), 4, 0, 52, 60, _x + 24, _y + 17);
 
-	//VIDAS
+	//CORAÇOES (OS CHEIOS JA VEM NO DESENHO: SO APAGA OS QUE FORAM)
 	var _vidas = _p != noone ? _p.vida_atual : 0;
-	var _vt = _p != noone ? _p.vida_total : 3;
-	for(var i = 0; i < _vt; i++) draw_sprite_ext(spr_coracao, i < _vidas ? 2 : 1, _px + _w / 2 - (_vt - 1) * 9 + i * 18, _ry + 72, .7, .7, 0, c_white, 1);
-
-	//PONTOS
-	var _pontos = _n == 2 ? global.pontos_2 : global.pontos_1;
-	draw_set_font(fnt_hud);
-	draw_text_transformed_color(_px + _w / 2, _ry + 92, _pt ? "PONTOS" : "SCORE", .55, .55, 0, #92A1B9, #92A1B9, #92A1B9, #92A1B9, 1);
-	draw_text_transformed_color(_px + _w / 2 + 1, _ry + 105, string(_pontos), 1, 1, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_px + _w / 2, _ry + 104, string(_pontos), 1, 1, 0, #FFE66B, #FFE66B, #FFE66B, #FFE66B, 1);
-
-	//PROXIMA PEÇA
-	var _by = _ry + 120;
-	draw_text_transformed_color(_px + _w / 2, _by, _pt ? "PROXIMA" : "NEXT", .55, .55, 0, #92A1B9, #92A1B9, #92A1B9, #92A1B9, 1);
-	draw_set_color(#1E1A38);
-	draw_rectangle(_px + _w / 2 - 22, _by + 6, _px + _w / 2 + 22, _by + 34, false);
-	draw_set_color(#5A3A8A);
-	draw_rectangle(_px + _w / 2 - 22, _by + 6, _px + _w / 2 + 22, _by + 34, true);
-	versus_previa_desenhar(_zn, _px + _w / 2, _by + 20);
-
-	//ATAQUES A CAMINHO (QUE VAO NASCER NA MINHA ARENA): UM ICONE POR ATAQUE
-	var _ay = _by + 42;
-	var _pisca = _zn.aviso > 0 and (current_time div 120) mod 2 == 0;
-	draw_text_transformed_color(_px + _w / 2, _ay, _pt ? "ATAQUES" : "INCOMING", .55, .55, 0, _pisca ? #FF5577 : #92A1B9, _pisca ? #FF5577 : #92A1B9, _pisca ? #FF5577 : #92A1B9, _pisca ? #FF5577 : #92A1B9, 1);
-	for(var i = 0; i < VS_MAX_ATAQUES; i++)
+	for(var i = 0; i < 3; i++)
 	{
-		var _ix = _px + 12 + i * 22;
-		draw_set_color(i < array_length(_zn.ataques) ? #5A1428 : #1E1A38);
-		draw_rectangle(_ix - 9, _ay + 8, _ix + 9, _ay + 26, false);
-		draw_set_color(i < array_length(_zn.ataques) ? #FF5577 : #3A3558);
-		draw_rectangle(_ix - 9, _ay + 8, _ix + 9, _ay + 26, true);
-		if(i < array_length(_zn.ataques)) bloco_icone_desenhar(string_lower(_zn.ataques[i]), _ix, _ay + 17, .75);
+		if(i < _vidas) continue;
+		var _hy = _y + 23 + 25 * i;
+		var _hx = _p1 ? _x + 10 : _x + 88.5;
+		draw_set_color(#242234);
+		draw_rectangle(_hx - 9, _hy - 11, _hx + 9, _hy + 11, false);
+		draw_sprite(spr_coracao, 1, _hx, _hy);
 	}
 
-	//ENERGIA DO ESPECIAL (CARGAS DE 0 A ENERGIA_MAX)
-	var _ey = _ay + 38;
-	draw_text_transformed_color(_px + _w / 2, _ey, _pt ? "ESPECIAL" : "SPECIAL", .55, .55, 0, #92A1B9, #92A1B9, #92A1B9, #92A1B9, 1);
-	var _ew = _w - 24;
-	draw_set_color(#1E1A38);
-	draw_rectangle(_px + 12, _ey + 8, _px + 12 + _ew, _ey + 16, false);
-	draw_rectangle_color(_px + 12, _ey + 8, _px + 12 + _ew * (_zn.energia / ENERGIA_MAX), _ey + 16, #31FCFF, #8BFF32, #8BFF32, #31FCFF, false);
-	draw_set_color(#5A3A8A);
-	draw_rectangle(_px + 12, _ey + 8, _px + 12 + _ew, _ey + 16, true);
-	for(var k = 1; k < ENERGIA_MAX; k++) draw_line(_px + 12 + _ew * k / ENERGIA_MAX, _ey + 8, _px + 12 + _ew * k / ENERGIA_MAX, _ey + 16);
-	//MARCA DO CUSTO DO FANTASMA NA BARRA
-	draw_set_color(#FFE66B);
-	draw_line_width(_px + 12 + _ew * VS_FANT_CUSTO / ENERGIA_MAX, _ey + 6, _px + 12 + _ew * VS_FANT_CUSTO / ENERGIA_MAX, _ey + 18, 2);
+	//AS 4 CAIXAS: OS ATAQUES QUE VAO NASCER NA ARENA DESSE JOGADOR (VERMELHO = VEM COISA RUIM)
+	for(var i = 0; i < 4; i++)
+	{
+		var _bx = _x + 13.5 + 24 * i, _by = _y + 104.5;
+		if(i >= array_length(_zn.ataques)) continue;
+		draw_set_color(#5A1428);
+		draw_rectangle(_bx - 8, _by - 8, _bx + 8, _by + 8, false);
+		draw_set_color(#FF5577);
+		draw_rectangle(_bx - 8, _by - 8, _bx + 8, _by + 8, true);
+		bloco_icone_desenhar(string_lower(_zn.ataques[i]), _bx, _by, .7);
+	}
+
+	//PONTOS (O NUMERO FICA EMBAIXO DA PALAVRA "SCORE" QUE JA VEM NO DESENHO)
+	var _val = string(_n == 2 ? global.pontos_2 : global.pontos_1);
+	draw_set_halign(fa_center);
+	var _es = min(1.5, 58 / max(1, string_width(_val)));
+	draw_text_transformed_color(_x + 51.5, _y + 135, _val, _es, _es, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_x + 50.5, _y + 134, _val, _es, _es, 0, c_white, c_white, c_white, c_white, 1);
+
+	//EMBAIXO DA CAIXA: O QUE O ESPECIAL (FANTASMA) ESTA FAZENDO E A TECLA DO TELEPORTE
+	var _cx = _x + COOP_CAIXA_W / 2, _ty = _y + COOP_CAIXA_H + 10;
+	var _cinza = #92A1B9;
 	var _imp = imputs_jogador(_n);
 	if(instance_exists(_zn.fantasma))
 	{
 		var _segs = ceil(_zn.fant_t / room_speed);
-		draw_text_transformed_color(_px + _w / 2, _ey + 27, (_pt ? "FANTASMA: " : "GHOST: ") + string(_segs) + (_pt ? " SEG" : " SEC"), .55, .55, 0, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, 1);
-		draw_text_transformed_color(_px + _w / 2, _ey + 37, "[" + tecla_nome(versus_tecla_poder(_n)) + "] " + (_pt ? "ENCERRAR" : "END"), .45, .45, 0, #92A1B9, #92A1B9, #92A1B9, #92A1B9, 1);
+		draw_text_transformed_color(_cx, _ty, (_pt ? "FANTASMA: " : "GHOST: ") + string(_segs) + (_pt ? " SEG" : " SEC"), .55, .55, 0, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, 1);
+		draw_text_transformed_color(_cx, _ty + 10, "[" + tecla_nome(versus_tecla_poder(_n)) + "] " + (_pt ? "ENCERRAR" : "END"), .45, .45, 0, _cinza, _cinza, _cinza, _cinza, 1);
 	}
 	else if(_zn.invasor > 0)
 	{
-		draw_text_transformed_color(_px + _w / 2, _ey + 27, _pt ? "INVADIDO!" : "INVADED!", .6, .6, 0, #FF5577, #FF5577, #FF5577, #FF5577, 1);
+		draw_text_transformed_color(_cx, _ty, _pt ? "INVADIDO!" : "INVADED!", .6, .6, 0, #FF5577, #FF5577, #FF5577, #FF5577, 1);
 	}
 	else if(_zn.energia >= VS_FANT_CUSTO)
 	{
 		var _pp = (current_time div 250) mod 2 == 0;
-		draw_text_transformed_color(_px + _w / 2, _ey + 27, (_pt ? "FANTASMA: " : "GHOST: ") + tecla_nome(versus_tecla_poder(_n)), .6, .6, 0, _pp ? TEMPO_VERDE : c_white, _pp ? TEMPO_VERDE : c_white, _pp ? TEMPO_VERDE : c_white, _pp ? TEMPO_VERDE : c_white, 1);
+		var _cp = _pp ? TEMPO_VERDE : c_white;
+		draw_text_transformed_color(_cx, _ty, (_pt ? "FANTASMA: " : "GHOST: ") + tecla_nome(versus_tecla_poder(_n)), .6, .6, 0, _cp, _cp, _cp, _cp, 1);
 	}
 	else if(_zn.energia >= 1)
 	{
-		draw_text_transformed_color(_px + _w / 2, _ey + 27, tecla_nome(_imp.down) + " + " + tecla_nome(_imp.soco), .5, .5, 0, #31FCFF, #31FCFF, #31FCFF, #31FCFF, 1);
+		draw_text_transformed_color(_cx, _ty, tecla_nome(_imp.down) + " + " + tecla_nome(_imp.soco), .5, .5, 0, #31FCFF, #31FCFF, #31FCFF, #31FCFF, 1);
 	}
-
-	//TECLA DO TELEPORTE DESSE JOGADOR
-	var _im2 = imputs_jogador(_n);
-	draw_text_transformed_color(_px + _w / 2, _py + _h - 10, (_pt ? "TELEPORTE: " : "DROP: ") + tecla_nome(_im2.acelerar), .5, .5, 0, #92A1B9, #92A1B9, #92A1B9, #92A1B9, 1);
+	draw_text_transformed_color(_cx, _ty + 22, (_pt ? "TELEPORTE: " : "DROP: ") + tecla_nome(_imp.acelerar), .5, .5, 0, _cinza, _cinza, _cinza, _cinza, 1);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 	draw_set_color(c_white);
 }
 
-//CENTRO DA TELA (O VAO ENTRE AS ARENAS): "VS", VITORIAS, TEMPO E A TABELA DE ATAQUES
+//CENTRO DA TELA (O VAO ENTRE AS ARENAS): "VS", VITORIAS E TEMPO
 function versus_centro_desenhar()
 {
 	var _pt = global.linguagem == 0;
@@ -856,66 +860,17 @@ function versus_centro_desenhar()
 	var _tempo = string_replace_all(string_format(_seg div 60, 2, 0), " ", "0") + ":" + string_replace_all(string_format(_seg mod 60, 2, 0), " ", "0");
 	draw_text_transformed_color(_cx, _top + 88, _tempo, 1, 1, 0, c_white, c_white, c_white, c_white, 1);
 
-	//TABELA: FECHAR LINHAS MANDA ATAQUES PRO OUTRO
-	var _ty = _top + 112;
-	draw_set_color(_sombra);
-	draw_set_alpha(.85);
-	draw_rectangle(_cx - _w / 2, _ty, _cx + _w / 2, _ty + 176, false);
-	draw_set_alpha(1);
-	draw_set_color(#5A3A8A);
-	draw_rectangle(_cx - _w / 2, _ty, _cx + _w / 2, _ty + 176, true);
-	draw_text_transformed_color(_cx, _ty + 9, _pt ? "COMO ATACAR" : "HOW TO ATTACK", .6, .6, 0, #FFE66B, #FFE66B, #FFE66B, #FFE66B, 1);
-	var _lista = [
-		[_pt ? "1 LINHA" : "1 LINE", ["inimigo"]],
-		[_pt ? "2 LINHAS" : "2 LINES", ["gelo"]],
-		[_pt ? "3 LINHAS" : "3 LINES", ["cabecudo"]],
-		[_pt ? "4 LINHAS" : "4 LINES", ["bomba", "laser"]],
-		["COMBO x3", ["raivoso"]],
-	];
-	draw_set_halign(fa_left);
-	for(var i = 0; i < array_length(_lista); i++)
-	{
-		var _y = _ty + 28 + i * 20;
-		draw_text_transformed_color(_cx - _w / 2 + 8, _y, _lista[i][0], .6, .6, 0, c_white, c_white, c_white, c_white, 1);
-		for(var k = 0; k < array_length(_lista[i][1]); k++) bloco_icone_desenhar(_lista[i][1][k], _cx + _w / 2 - 18 - k * 22, _y, .8);
-	}
-	draw_set_halign(fa_center);
-	draw_text_transformed_color(_cx, _ty + 134, _pt ? "LINHAS TAMBEM DEFENDEM!" : "LINES ALSO DEFEND!", .5, .5, 0, #5CC8FF, #5CC8FF, #5CC8FF, #5CC8FF, 1);
-	draw_text_transformed_color(_cx, _ty + 152, _pt ? "2 CARGAS: FANTASMA" : "2 CHARGES: GHOST", .5, .5, 0, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, TEMPO_VERDE, 1);
-	draw_text_transformed_color(_cx, _ty + 164, _pt ? "INVADE E AMASSA O OUTRO" : "INVADE AND SQUASH THEM", .45, .45, 0, #92A1B9, #92A1B9, #92A1B9, #92A1B9, 1);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 	draw_set_color(c_white);
 }
 
-//MOLDURA DE UMA ARENA (POR CIMA DAS PEÇAS): CONTORNO, CANTOS E O CHAO
+//MOLDURA DE UMA ARENA (POR CIMA DAS PEÇAS): SPR_NEW_AREA_VERSUS (180X315), FRAME 0 = P1 (AZUL) E FRAME 1 = P2 (VERMELHO).
+//IGUAL AO COOP, A ARENA FICA 10PX PRA DENTRO DA ESQUERDA E 2PX PRA BAIXO DO TOPO. O CHAO DESENHADO JA VEM NELA
 function versus_moldura_desenhar(_z, _sx, _sy)
 {
 	var _zn = obj_area.zonas[_z];
-	var _cor = _z == 0 ? VS_COR_P1 : VS_COR_P2;
-	var _x1 = _zn.x - 3 + _sx, _y1 = obj_area.y - 3 + _sy, _x2 = _zn.x + VS_COLS * CEL + 2 + _sx, _y2 = obj_area.y + obj_area.sprite_height + 2 + _sy;
-	draw_set_color(#0E071B);
-	draw_rectangle(_x1 - 1, _y1 - 1, _x2 + 1, _y2 + 1, true);
-	draw_set_color(merge_color(_cor, c_white, .35));
-	draw_rectangle(_x1, _y1, _x2, _y2, true);
-	draw_rectangle(_x1 + 1, _y1 + 1, _x2 - 1, _y2 - 1, true);
-	draw_set_color(_cor);
-	//CANTOS MAIS FORTES
-	var _c = 10;
-	draw_rectangle(_x1 - 1, _y1 - 1, _x1 + _c, _y1 + 1, false); draw_rectangle(_x1 - 1, _y1 - 1, _x1 + 1, _y1 + _c, false);
-	draw_rectangle(_x2 - _c, _y1 - 1, _x2 + 1, _y1 + 1, false); draw_rectangle(_x2 - 1, _y1 - 1, _x2 + 1, _y1 + _c, false);
-	draw_rectangle(_x1 - 1, _y2 - 1, _x1 + _c, _y2 + 1, false); draw_rectangle(_x1 - 1, _y2 - _c, _x1 + 1, _y2 + 1, false);
-	draw_rectangle(_x2 - _c, _y2 - 1, _x2 + 1, _y2 + 1, false); draw_rectangle(_x2 - 1, _y2 - _c, _x2 + 1, _y2 + 1, false);
-	//ETIQUETA "P1"/"P2" NO TOPO
-	draw_set_font(fnt_hud);
-	draw_set_halign(fa_center);
-	draw_set_valign(fa_middle);
-	var _lx = (_x1 + _x2) / 2;
-	draw_rectangle(_lx - 14, _y1 - 14, _lx + 14, _y1 - 3, false);
-	draw_text_transformed_color(_lx, _y1 - 8, "P" + string(_z + 1), .6, .6, 0, #0E071B, #0E071B, #0E071B, #0E071B, 1);
-	draw_set_halign(fa_left);
-	draw_set_valign(fa_top);
-	draw_set_color(c_white);
+	draw_sprite(spr_new_area_versus, _z, _zn.x - 10 + _sx, obj_area.y - 2 + _sy);
 }
 
 //TODO O HUD DO VERSUS (OBJ_AREA_VERSUS, POR CIMA DE TUDO NA ROOM)
@@ -1509,8 +1464,10 @@ function player_e_fantasma(_p)
 //CADA CAIXA TEM: A FAIXA COM O NOME, A BARRA DE ENERGIA (ESQUERDA), O RETRATO, OS 3 CORAÇOES (DIREITA), OS 8 PODERES, O SCORE DO
 //TIME E AS LETRAS A P E D R O P. EMBAIXO DE CADA UMA FICA UM PAINEL COM HI-SCORE/LEVEL (P1) E TEMPO/MOEDAS (P2).
 //CHAMADO PELO DRAW DO OBJ_BORDA (E RODA COM O OBJ_BORDA COMO "SELF": USA OS HUD_PAINEL, HUD_FAIXA, HUD_RETRATO E HUD_ICONE DELE)
-#macro COOP_CAIXA_W		103
-#macro COOP_CAIXA_H		180
+#macro COOP_CAIXA_W		103		//TAMANHO DA CAIXA VISIVEL (A SPRITE TEM 117X186 COM UMA MARGEM TRANSPARENTE: 10PX NA ESQUERDA E 4PX EM CIMA)
+#macro COOP_CAIXA_H		158
+#macro COOP_CAIXA_OX	10		//ONDE A CAIXA VISIVEL COMEÇA DENTRO DA SPRITE
+#macro COOP_CAIXA_OY	4
 #macro COOP_MOLDURA_W	276
 
 //UMA CAIXA DE JOGADOR (_N = 1 OU 2) COM O CANTO DE CIMA ESQUERDO EM (_X, _Y). _CARA = EMOÇAO DO MOMENTO (RETRATO)
@@ -1520,26 +1477,29 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	var _sombra = #0E071B;
 	var _p = player_n(_n);
 	var _pt = global.linguagem == 0;
-	draw_sprite(spr_coop_caixa, 0, _x, _y);
+	//O FRAME 0 DA SPRITE E DO P1 (CORAÇOES NA ESQUERDA, ENERGIA NA DIREITA) E O FRAME 1 E DO P2 (O CONTRARIO). (_X, _Y) = CANTO DA CAIXA VISIVEL
+	var _sx = _x - COOP_CAIXA_OX, _sy = _y - COOP_CAIXA_OY;
+	var _p1 = _n == 1;
+	draw_sprite(spr_coop_caixa, _n - 1, _sx, _sy);
 	//FEBRE: A CAIXA PISCA EM LARANJA JUNTO COM A MOLDURA
 	if(febre_mix > 0)
 	{
 		gpu_set_fog(true, #FF7A1A, 0, 1);
-		draw_sprite_ext(spr_coop_caixa, 0, _x, _y, 1, 1, 0, c_white, febre_mix);
+		draw_sprite_ext(spr_coop_caixa, _n - 1, _sx, _sy, 1, 1, 0, c_white, febre_mix);
 		gpu_set_fog(false, c_white, 0, 1);
 	}
 
 	//FAIXA DE CIMA: A COR DO JOGADOR NA PONTA E O NOME
 	draw_set_alpha(.55);
 	draw_set_color(_cor_j);
-	draw_rectangle(_x + 4, _y + 3, _x + 9, _y + 9, false);
+	draw_rectangle(_x + 3, _y + 5, _x + 8, _y + 11, false);
 	draw_set_alpha(1);
 	draw_set_font(fnt_hud);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_middle);
 	var _nome = "PLAYER " + string(_n);
-	draw_text_transformed_color(_x + 13, _y + 7.5, _nome, .55, .55, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_x + 12, _y + 6.5, _nome, .55, .55, 0, c_white, c_white, c_white, c_white, 1);
+	draw_text_transformed_color(_x + 13, _y + 9.5, _nome, .55, .55, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_x + 12, _y + 8.5, _nome, .55, .55, 0, c_white, c_white, c_white, c_white, 1);
 
 	//VEZ DO TELEPORTE: A CAIXA DE QUEM TEM A VEZ PISCA NA COR DELE E GANHA A ETIQUETA "TELE" NA FAIXA DO NOME
 	if(coop_vez_de() == _n)
@@ -1551,17 +1511,17 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 		draw_rectangle(_x - 1, _y - 1, _x + COOP_CAIXA_W, _y + COOP_CAIXA_H, true);
 		draw_rectangle(_x, _y, _x + COOP_CAIXA_W - 1, _y + COOP_CAIXA_H - 1, true);
 		draw_set_alpha(1);
-		draw_rectangle_color(_x + 66, _y + 2, _x + 99, _y + 12, _cor_j, _cor_j, _cor_j, _cor_j, false);
+		draw_rectangle_color(_x + 62, _y + 4, _x + 97, _y + 13, _cor_j, _cor_j, _cor_j, _cor_j, false);
 		draw_set_halign(fa_center);
-		draw_text_transformed_color(_x + 83, _y + 7.5, "TELE", .5, .5, 0, _sombra, _sombra, _sombra, _sombra, 1);
+		draw_text_transformed_color(_x + 80, _y + 9, "TELE", .5, .5, 0, _sombra, _sombra, _sombra, _sombra, 1);
 		draw_set_halign(fa_left);
 	}
 
 	//BARRA DE ENERGIA (COLUNA DA ESQUERDA, 4 QUADRADOS): SOBE DE BAIXO PRA CIMA. CHEIA PISCA, E AO ENCHER DA UM CLARAO
-	var _ex1 = _x + 2, _ex2 = _x + 19, _ebase = _y + 80, _ealt = 66;
+	var _ex1 = _p1 ? _x + 80 : _x + 2, _ex2 = _p1 ? _x + 97 : _x + 19, _ebase = _y + 78, _ealt = 62;
 	var _etopo = _ebase - _ealt * clamp(energia_mostrada / ENERGIA_MAX, 0, 1);
 	var _cheia = global.energia >= ENERGIA_MAX;
-	var _celulas = [[_y + 67, _y + 80], [_y + 50, _y + 62], [_y + 33, _y + 45], [_y + 14, _y + 28]];	//DE BAIXO PRA CIMA
+	var _celulas = [[_y + 66, _y + 78], [_y + 49, _y + 62], [_y + 32, _y + 45], [_y + 16, _y + 28]];	//DE BAIXO PRA CIMA
 	for(var k = 0; k < 4; k++)
 	{
 		var _c1 = _celulas[k][0], _c2 = _celulas[k][1];
@@ -1579,7 +1539,7 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 		var _ex = (1 - energia_pulso) * 7;
 		draw_set_color(TEMPO_VERDE);
 		draw_set_alpha(energia_pulso * .8);
-		draw_rectangle(_ex1 - _ex, _y + 13 - _ex, _ex2 + _ex, _y + 81 + _ex, true);
+		draw_rectangle(_ex1 - _ex, _y + 12 - _ex, _ex2 + _ex, _y + 79 + _ex, true);
 		draw_set_alpha(1);
 		gpu_set_blendmode(bm_normal);
 	}
@@ -1594,17 +1554,22 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 		if(i < _vida) continue;
 		var _hy = _y + 23 + 25 * i;
 		draw_set_color(#242234);
-		draw_rectangle(_x + 81, _hy - 11, _x + 98, _hy + 11, false);
-		draw_sprite(spr_coracao, 1, _x + 90, _hy);
+		var _hx = _p1 ? _x + 10 : _x + 88.5;	//CENTRO DA COLUNA DOS CORAÇOES
+		draw_rectangle(_hx - 9, _hy - 11, _hx + 9, _hy + 11, false);
+		draw_sprite(spr_coracao, 1, _hx, _hy);
 	}
 
-	//OS 8 PODERES NA GRADE (4 POR LINHA). OS QUE O JOGADOR TEM FICAM ACESOS NA COR DELES; OS QUE FALTAM, SO A SOMBRA
+	//AS 4 CAIXAS DE PODER. OS PODERES QUE O JOGADOR TEM SE ACENDEM NA COR DELES, UM EM CADA CAIXA, NA ORDEM DA LISTA (SE TIVER MAIS DE 4, OS PRIMEIROS 4)
 	var _lista = global.poderes_lista;
+	var _caixa = 0;
 	for(var i = 0; i < array_length(_lista); i++)
 	{
 		var _pid = _lista[i].id;
 		var _tem = tem_poder(_pid);
-		var _bx = _x + 13.5 + 24 * (i mod 4), _by = _y + 106 + 21 * (i div 4);
+		if(!_tem) continue;
+		if(_caixa >= 4) break;
+		var _bx = _x + 13.5 + 24 * _caixa, _by = _y + 104.5;
+		_caixa++;
 		var _h = 8 * poder_pop[i];
 		var _pcor = _lista[i].cor;
 		if(_tem)
@@ -1626,14 +1591,6 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 				draw_rectangle(_bx - 6, _by + 5, _bx - 6 + 12 * _barra / 100, _by + 6, false);
 			}
 		}
-		else
-		{
-			draw_set_color(#1A1932);
-			draw_rectangle(_bx - 8, _by - 8, _bx + 8, _by + 8, false);
-			draw_set_color(#2E2A4A);
-			draw_rectangle(_bx - 8, _by - 8, _bx + 8, _by + 8, true);
-			hud_icone(_pid, _bx - 4, _by - 5, #2E2A4A, true);
-		}
 	}
 
 	//SCORE DO TIME (O NUMERO FICA EMBAIXO DA PALAVRA "SCORE" QUE JA VEM NO DESENHO) E DA UM PULINHO QUANDO CHEGA PONTO
@@ -1643,8 +1600,8 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	var _val = _n == 1 ? _dados.p1 : _dados.p2;	//CADA UM MOSTRA O SEU PROPRIO SCORE (O DO TIME FICA NA FAIXA DE BAIXO)
 	var _es = min(1.5, 58 / max(1, string_width(_val))) * score_esc;	//ENCOLHE SE O NUMERO FICAR COMPRIDO
 	var _sc = (score_esc > 1.05) ? c_yellow : c_white;
-	draw_text_transformed_color(_x + 52, _y + 157, _val, _es, _es, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_x + 51, _y + 156, _val, _es, _es, 0, _sc, _sc, _sc, _sc, 1);
+	draw_text_transformed_color(_x + 51.5, _y + 135, _val, _es, _es, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_x + 50.5, _y + 134, _val, _es, _es, 0, _sc, _sc, _sc, _sc, 1);
 
 	//LETRAS A P E D R O P: AS QUE FALTAM FICAM APAGADAS (O DESENHO JA TEM). A QUE PEGOU GANHA A COR E UM "POP"
 	var _cores_l = [ #8BFF32, #FFFF00, #DE65FF, #31FCFF, #FF3237, #8BFF32, #FFFF00];
@@ -1655,7 +1612,7 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	draw_set_font(fnt_hud);
 	for(var i = 0; i < array_length(_let); i++)
 	{
-		var _lx = _x + 8 + 14 * i, _ly = _y + 171.5;
+		var _lx = _x + 7 + 14 * i, _ly = _y + 149.5;
 		if(_festa)
 		{
 			var _q = frac((1 - global.palavra_festa / PALAVRA_FESTA) * 2) * 1.6 - i * .1;
@@ -1685,7 +1642,7 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 		gpu_set_blendmode(bm_add);
 		draw_set_alpha(.4 * (1 - _pf * .5));
 		draw_set_color(#FFB21E);
-		draw_rectangle(_x - _ab, _y + 164 - _ab, _x + COOP_CAIXA_W + _ab, _y + 179 + _ab, false);
+		draw_rectangle(_x - _ab, _y + 142 - _ab, _x + COOP_CAIXA_W + _ab, _y + 157 + _ab, false);
 		draw_set_alpha(1);
 		gpu_set_blendmode(bm_normal);
 	}

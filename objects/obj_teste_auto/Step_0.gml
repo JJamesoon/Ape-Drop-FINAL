@@ -159,6 +159,15 @@ switch(etapa)
 		break;
 	#endregion
 
+	#region VERSUS: COMO ESTA O VISUAL
+	case "versus_ver":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 60) screen_save("teste_v1_versus.png");
+		if(_t == 400) screen_save("teste_v2_versus.png");
+		if(_t == 402) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
 	case "jcoop":
 		if(_t == 2)
