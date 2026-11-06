@@ -78,6 +78,13 @@ if(timer_array[array_length(timer_array)-1] >= sprite_get_number(spr_efeito_line
 		meu_y -= CEL;
 	}else instance_destroy();
 	
+	//VERSUS: CADA ARENA TEM O ANDAR DELA (VERSUS_ELEVAR_ANDAR, SCR_COOP)
+	if(zona >= 0)
+	{
+		if(versus_meta_atingida(zona)) versus_elevar_andar(zona);
+		exit;
+	}
+
 	//CHEGOU NA META DO ANDAR? (ANDAR 1 = 2 LINHAS, 2 = 6, 3 = 10)
 	var _andar_1;
 	var _andar_2;

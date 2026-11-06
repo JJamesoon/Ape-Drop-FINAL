@@ -204,15 +204,11 @@ function borda_desenhar(_spr, _frame, _x, _y, _extra, _alpha = 1)
 #macro VS_RAMPA_S			200		//SEGUNDOS ATE O FIM DA RAMPA
 #macro VS_COMBO_TEMPO		(room_speed * 4)	//TEMPO PRA EMENDAR OUTRA LINHA NO COMBO DA ZONA
 #macro VS_MAX_ATAQUES		6		//BLOCOS PENDENTES NA FILA DE QUEM RECEBE (PODER NAO USA SE A FILA ESTA CHEIA)
-#macro VS_NIVEL_S			120		//SEGUNDOS DE CADA NIVEL DA PARTIDA (NIVEL 1, 2 E 3: O 3 NAO ACABA)
 #macro VS_ESCOLHA_S		5		//SEGUNDOS PRA ESCOLHER O PODER (O JOGO DE QUEM FECHOU A LINHA FICA PARADO)
 #macro VS_ESCOLHA_ATRASO	28		//FRAMES ATE O MENU APARECER DEPOIS DE FECHAR A LINHA (DEIXA A LINHA EXPLODIR)
 #macro VS_COR_P1			#4D7CFF		//AZUL (O LADO ESQUERDO)
 #macro VS_COR_P2			#FF553A		//VERMELHO (O LADO DIREITO)
 
-global.vs_linha_y		= 0;		//ALTURA DA LINHA DOS ANDARES NO VERSUS (SOBE SUAVE QUANDO O NIVEL SOBE)
-global.vs_linha_int		= 0;		//VIBRAÇAO DA LINHA (SOBE NA HORA QUE O NIVEL SOBE E VAI ACALMANDO)
-global.vs_nivel		= 1;		//NIVEL DA PARTIDA (VERSUS_NIVEL), PRA AVISAR QUANDO SOBE
 global.vs_perdedor	= 0;		//0 NINGUEM PERDEU, 1 OU 2 = JOGADOR QUE PERDEU A RODADA
 global.vs_vitorias	= [0, 0];	//VITORIAS DA SESSAO (NAO ZERA QUANDO REINICIA: REVANCHE)
 global.vs_contou	= false;	//A VITORIA DA RODADA JA FOI CONTADA?
@@ -304,7 +300,13 @@ function versus_criar()
 			chuva : 0,						//PEÇAS RAPIDAS QUE AINDA VAO CAIR NESSA ARENA (PODER CHUVA)
 			duplas : 0,						//PEÇAS QUE AINDA VEM EM PAR NESSA ARENA (PODER DUPLAS)
 			dupla_par : false,
-			lin3 : 0,						//LINHAS FECHADAS NO NIVEL 3 (GUARDA PRO MINIJOGO DA 5A LINHA)
+			lin3 : 0,						//LINHAS FECHADAS NO ANDAR 3 (GUARDA PRO MINIJOGO DA 5A LINHA)
+			andar : 1,						//ANDAR DESSA ARENA (1, 2 OU 3), COMO NO ARCADE. DEFINE OS PODERES QUE APARECEM
+			nivel : 1,						//LEVEL: SOBE QUANDO COMPLETA O ANDAR 3 (E O ANDAR VOLTA PRO 1)
+			chao : 0,						//LINHAS QUE JA VIRARAM CHAO NESSE ANDAR (O CHAO SOBE ATE A LINHA DOS ANDARES)
+			regua_y : 0,					//ALTURA DESENHADA DA LINHA DOS ANDARES (SOBE SUAVE)
+			regua_int : 0,					//VIBRAÇAO DA LINHA (SOBE QUANDO MUDA DE ANDAR E VAI ACALMANDO)
+			sem_tele : 0,					//FRAMES SEM TELEPORTE (O ESPAÇO QUE CONFIRMA A ESCOLHA NAO PODE TELEPORTAR NO MESMO FRAME)
 		});
 	}
 }
@@ -315,9 +317,6 @@ function versus_montar()
 	vs_montado = true;
 	global.vs_perdedor = 0;
 	global.vs_contou = false;
-	global.vs_nivel = 1;
-	global.vs_linha_y = y + sprite_height - CEL * 2;
-	global.vs_linha_int = 0;
 	//OBJETOS DO VERSUS ANTIGO E DO ARCADE (PAREDES, CHAO E REGUA QUE A ROOM TRAZ NO LUGAR ERRADO)
 	with(obj_block) instance_destroy();
 	with(obj_linha) instance_destroy();
@@ -334,6 +333,7 @@ function versus_montar()
 		//O PLAYER NASCE NO MEIO DO CHAO DA ZONA
 		instance_create_layer(_zn.x + VS_COLS * CEL / 2, y + sprite_height, "Blocos", obj_player, { jogador : z + 1 });
 		versus_sortear(_zn);
+		_zn.regua_y = versus_regua_alvo(z);
 	}
 }
 
@@ -418,13 +418,13 @@ function versus_atualizar()
 	if(global.vs_perdedor != 0) exit;
 	versus_perigo_atualizar();
 	versus_fantasma_atualizar();
-	versus_nivel_atualizar();
 	for(var z = 0; z < 2; z++)
 	{
 		var _zn = zonas[z];
 		if(_zn.combo_t > 0) _zn.combo_t--; else _zn.combo = 0;
 		if(_zn.aviso > 0) _zn.aviso--;
 		if(_zn.enviou > 0) _zn.enviou--;
+		if(_zn.sem_tele > 0) _zn.sem_tele--;
 		for(var k = 0; k < 4; k++) _zn.slot_pop[k] = max(0, _zn.slot_pop[k] - .06);
 		versus_poderes_atualizar(z);
 		if(_zn.congelada) continue; //TEMPO PARADO (PODER DO FANTASMA): NAO NASCEM PEÇAS NESSA ARENA
@@ -475,6 +475,11 @@ function versus_limpar_linhas(_z, _linhas)
 	var _cx = _zn.x + VS_COLS * CEL / 2;
 	var _y_texto = (y + CEL / 2) + CEL * _linhas[_n - 1];
 
+	//IGUAL AO ARCADE: A LINHA FECHADA NA ALTURA DO CHAO (LOGO ACIMA DELE) VIRA CHAO E O CHAO SOBE. SE ELE CHEGA NA LINHA DOS ANDARES, SOBE DE ANDAR
+	var _regua_y = versus_regua_alvo(_z);
+	var _no_chao = false;
+	for(var k = 0; k < _n; k++) if(lins - _zn.chao == _linhas[k] + 1) _no_chao = true;
+
 	//MARCANDO NA GRADE (2 = SENDO DESTRUIDA, PRA NAO DETECTAR DE NOVO)
 	for(var k = 0; k < _n; k++)
 	{
@@ -510,7 +515,9 @@ function versus_limpar_linhas(_z, _linhas)
 		_e.zona = _z;
 		_e.somar = false;
 		_e.combo = _n;
-		_e.criar_chao_combo = false;
+		_e.criar_chao_combo = _no_chao;
+		_e.regua_y = _regua_y;
+		if(_no_chao and floor(y + CEL * _row) >= _regua_y) _zn.chao++;
 	}
 
 	//DEFESA: ESSAS LINHAS CANCELAM OS ATAQUES QUE EU AINDA IA RECEBER. E O JOGADOR GANHA UMA ESCOLHA DE PODER
@@ -547,7 +554,7 @@ function versus_perder(_z)
 function versus_teleporte(_n)
 {
 	var _zn = versus_zona_do(_n);
-	if(_zn.congelada or !is_undefined(_zn.escolha)) return; //TEMPO PARADO NA ARENA (OU ESCOLHENDO PODER): NADA TELEPORTA
+	if(_zn.congelada or !is_undefined(_zn.escolha) or _zn.sem_tele > 0) return; //TEMPO PARADO NA ARENA (OU ESCOLHENDO PODER): NADA TELEPORTA
 	fila_limpar_zona(_zn);
 	if(!instance_exists(_zn.atual)) return;
 	with(_zn.atual) teleportar_peca();
@@ -895,20 +902,6 @@ function versus_centro_desenhar()
 	var _seg = floor(global.tempo_partida);
 	var _tempo = string_replace_all(string_format(_seg div 60, 2, 0), " ", "0") + ":" + string_replace_all(string_format(_seg mod 60, 2, 0), " ", "0");
 	draw_text_transformed_color(_cx, _top + 88, _tempo, 1, 1, 0, c_white, c_white, c_white, c_white, 1);
-	//NIVEL DA PARTIDA (SOBE A CADA VS_NIVEL_S SEGUNDOS ATE O 3) E UMA BARRINHA ATE O PROXIMO. O NIVEL DECIDE OS PODERES QUE APARECEM
-	var _nv = versus_nivel();
-	var _nvt = _pt ? "NIVEL " + string(_nv) : "LEVEL " + string(_nv);
-	draw_text_transformed_color(_cx + 1, _top + 105, _nvt, .6, .6, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_cx, _top + 104, _nvt, .6, .6, 0, #31FCFF, #31FCFF, #31FCFF, #31FCFF, 1);
-	if(_nv < 3)
-	{
-		var _pr = frac(global.tempo_partida / VS_NIVEL_S);
-		draw_set_color(#1E1A38);
-		draw_rectangle(_cx - 24, _top + 112, _cx + 24, _top + 115, false);
-		draw_set_color(#31FCFF);
-		draw_rectangle(_cx - 24, _top + 112, _cx - 24 + 48 * _pr, _top + 115, false);
-	}
-
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 	draw_set_color(c_white);
@@ -1915,29 +1908,50 @@ function coop_hud_desenhar()
 //==================== VERSUS: PODERES POR ESCOLHA ====================
 //FECHAR LINHA DA UMA ESCOLHA: O JOGO DE QUEM FECHOU PARA POR ATE VS_ESCOLHA_S SEGUNDOS (O DO ADVERSARIO CONTINUA), APARECEM 3 OPÇOES NO MEIO
 //DA ARENA, E A ESCOLHIDA FICA GUARDADA NUMA DAS 4 CAIXAS. DEPOIS E SO APERTAR A TECLA DA CAIXA (P1: 1 2 3 4 / P2: NUM 5 6 7 8).
-//O QUE APARECE DEPENDE DO NIVEL DA PARTIDA (SOBE A CADA VS_NIVEL_S SEGUNDOS) E DO COMBO:
-//	NIVEL 1: ESPECIAL (PRA VOCE), INIMIGO PATRULHEIRO, RAIVOSO		NIVEL 2: ELETRICO (PRA VOCE), PEDRA, BURACO NEGRO, LASER
-//	NIVEL 3: BOMBA, CABEÇADA, SNIPER, ABELHAS, FANTASMA				COMBO DE 3 LINHAS: GELATINA, GELO, CHUVA DE PEÇAS, PEÇAS DUPLAS
+//O QUE APARECE DEPENDE DO ANDAR DE QUEM FECHOU A LINHA (O ANDAR SOBE COMO NO ARCADE: O CHAO SOBE ATE A LINHA DOS ANDARES) E DO COMBO:
+//	ANDAR 1: ESPECIAL (PRA VOCE), INIMIGO PATRULHEIRO, RAIVOSO		ANDAR 2: ELETRICO (PRA VOCE), PEDRA, BURACO NEGRO, LASER
+//	ANDAR 3: BOMBA, CABEÇADA, SNIPER, ABELHAS, FANTASMA				COMBO DE 3 LINHAS: GELATINA, GELO, CHUVA DE PEÇAS, PEÇAS DUPLAS
 //OS PODERES "PRA VOCE" NASCEM NA PROPRIA ARENA; OS OUTROS, NA DO ADVERSARIO. LINHAS FECHADAS AINDA CANCELAM ATAQUES QUE ESTAVAM CHEGANDO.
 //(AINDA NAO TEM: O MINIJOGO QUE O NIVEL 3 DA NA 5A LINHA. A CONTA JA ESTA EM LIN3)
 
-//NIVEL ATUAL DA PARTIDA (1, 2 OU 3)
-function versus_nivel()
+//ALTURAS DA LINHA DOS ANDARES (EM CASAS, DO CHAO): ANDAR 1 = 2, ANDAR 2 = 6, ANDAR 3 = 10 (IGUAL AO ARCADE)
+//Y DA LINHA DOS ANDARES DA ZONA _Z (ONDE O CHAO TEM QUE CHEGAR PRA SUBIR DE ANDAR)
+function versus_regua_alvo(_z)
 {
-	return clamp(1 + floor(global.tempo_partida / VS_NIVEL_S), 1, 3);
+	var _a = obj_area;	//(CHAMADO DE DENTRO DE OUTROS OBJETOS, ENTAO NADA DE X/Y SOLTO)
+	var _alturas = [0, 2, 6, 10];
+	return floor(_a.y + _a.sprite_height - CEL * _alturas[_a.zonas[_z].andar]);
 }
 
-//SUBIU DE NIVEL: AVISO NO CENTRO DA TELA
-function versus_nivel_atualizar()
+//O CHAO DA ZONA CHEGOU NA LINHA DOS ANDARES?
+function versus_meta_atingida(_z)
 {
-	var _nv = versus_nivel();
-	if(_nv == global.vs_nivel) return;
-	global.vs_nivel = _nv;
-	global.vs_linha_int = 12;	//A LINHA VIBRA AO SUBIR DE NIVEL
-	efeito_texto((global.linguagem == 0 ? "NIVEL " : "LEVEL ") + string(_nv) + "!", room_width / 2, y + 150, #31FCFF, 1.8);
-	onda_choque(room_width / 2, y + 150, 120, 6, 30);
-	som_tocar(snd_jingle_poder);
-	shakes(6, 2);
+	var _alturas = [0, 2, 6, 10];
+	var _zn = obj_area.zonas[_z];
+	return _zn.chao >= _alturas[_zn.andar];
+}
+
+//SOBE DE ANDAR: O CHAO CONSTRUIDO SOME (OS BLOCOS DE CIMA CAEM), A LINHA SOBE E OS PODERES MUDAM. DEPOIS DO ANDAR 3 VOLTA PRO 1 E O LEVEL SOBE
+//(CHAMADO PELO OBJ_EFEITO_LINE NO FIM DA ANIMAÇAO DA LINHA)
+function versus_elevar_andar(_z)
+{
+	var _a = obj_area;
+	var _zn = _a.zonas[_z];
+	var _zx1 = _zn.x, _zx2 = _zn.x + VS_COLS * CEL, _chao_y = _a.y + _a.sprite_height;
+	with(obj_block) if(x > _zx1 and x < _zx2 and y < _chao_y) instance_destroy();	//SO O CHAO QUE SUBIU (O DE BAIXO DA ARENA FICA)
+	_zn.chao = 0;
+	_zn.andar++;
+	var _volta = _zn.andar > 3;
+	if(_volta) { _zn.andar = 1; _zn.nivel++; }
+	_zn.regua_int = 12;
+	var _cx = _zn.x + VS_COLS * CEL / 2;
+	var _pt = global.linguagem == 0;
+	var _txt = _volta ? "LEVEL " + string(_zn.nivel) + "!" : (_pt ? "ANDAR " : "FLOOR ") + string(_zn.andar) + "!";
+	efeito_texto(_txt, _cx, _a.y + 120, #FFF3B0, 1.7);
+	onda_choque(_cx, versus_regua_alvo(_z), 160, 7, 36);
+	shakes(8, 2);
+	som_tocar(snd_new_level);
+	versus_energia_ganhar(_z, 1);
 }
 
 //TECLA DA CAIXA _I (0 A 3) DO JOGADOR _N
@@ -2010,9 +2024,9 @@ function versus_recompensa(_z, _n)
 	var _zn = zonas[_z];
 	var _combo = _zn.combo >= 3;
 	if(_combo) _zn.combo = 0;
-	if(versus_nivel() >= 3) _zn.lin3 += _n;
+	if(_zn.andar >= 3) _zn.lin3 += _n;
 	if(array_length(_zn.recompensas) >= 3) return; //(MUITA COISA NA FILA: IGNORA)
-	array_push(_zn.recompensas, { nivel : versus_nivel(), combo : _combo });
+	array_push(_zn.recompensas, { nivel : _zn.andar, combo : _combo });
 	if(is_undefined(_zn.escolha) and _zn.escolha_atraso <= 0) _zn.escolha_atraso = VS_ESCOLHA_ATRASO;
 }
 
@@ -2042,7 +2056,7 @@ function versus_poderes_atualizar(_z)
 	var _qtd = array_length(_e.opcoes);
 	if(keyboard_check_pressed(_imp.left)) { _e.sel = (_e.sel + _qtd - 1) mod _qtd; som_tocar(snd_menu_select_02, .05); }
 	if(keyboard_check_pressed(_imp.rigth)) { _e.sel = (_e.sel + 1) mod _qtd; som_tocar(snd_menu_select_02, .05); }
-	var _ok = keyboard_check_pressed(_imp.soco) or keyboard_check_pressed(_imp.soco_press);
+	var _ok = keyboard_check_pressed(_imp.soco) or keyboard_check_pressed(_imp.soco_press) or keyboard_check_pressed(_imp.acelerar);	//(ESPAÇO / NUM 0 TAMBEM CONFIRMA: NAO PRECISA ESPERAR O TEMPO)
 	for(var i = 0; i < _qtd; i++) if(keyboard_check_pressed(versus_tecla_slot(_n, i))) { _e.sel = i; _ok = true; }
 	_e.t--;
 	if(_e.t <= 0) _ok = true; //ACABOU O TEMPO: FICA COM A OPÇAO QUE ESTA MARCADA
@@ -2085,6 +2099,7 @@ function versus_escolha_fechar(_z)
 	_zn.slot_t[_s] = current_time;
 	_zn.slot_pop[_s] = 1;
 	_zn.escolha = undefined;
+	_zn.sem_tele = 6;
 	array_delete(_zn.recompensas, 0, 1);
 	var _p = player_n(_z + 1);
 	if(_p != noone and !instance_exists(_zn.fantasma)) _p.vs_parado = false;
@@ -2205,20 +2220,18 @@ function versus_escolha_desenhar(_z)
 	draw_set_color(c_white);
 }
 
-//A LINHA DOS ANDARES DO VERSUS (A MESMA DO ARCADE: FEIXE ENTRE AS DUAS CAPSULAS, COM PULSOS), UMA EM CADA ARENA. ELA MOSTRA O NIVEL DA PARTIDA:
-//NIVEL 1 = 2 CASAS DE ALTURA, NIVEL 2 = 6, NIVEL 3 = 10 (IGUAL AOS ANDARES DO ARCADE). SOBE SUAVE E VIBRA QUANDO O NIVEL SOBE
+//A LINHA DOS ANDARES DO VERSUS (A MESMA DO ARCADE: FEIXE ENTRE AS DUAS CAPSULAS, COM PULSOS), UMA EM CADA ARENA, NA ALTURA DO ANDAR DELA
+//(ANDAR 1 = 2 CASAS, 2 = 6, 3 = 10). SOBE SUAVE E VIBRA QUANDO O ANDAR MUDA
 function versus_linha_desenhar(_sx, _sy)
 {
-	var _alturas = [0, 2, 6, 10];
-	var _alvo = obj_area.y + obj_area.sprite_height - CEL * _alturas[versus_nivel()];
-	global.vs_linha_y = lerp(global.vs_linha_y, _alvo, .08);
-	global.vs_linha_int = lerp(global.vs_linha_int, 0, .05);
-	var _vib = min(1, global.vs_linha_int / 12);
-	var _pulso = .8 + .2 * sin(current_time / 250);
-	var _yy = global.vs_linha_y + _sy;
 	for(var z = 0; z < 2; z++)
 	{
 		var _zn = obj_area.zonas[z];
+		_zn.regua_y = lerp(_zn.regua_y, versus_regua_alvo(z), .12);
+		_zn.regua_int = lerp(_zn.regua_int, 0, .05);
+		var _vib = min(1, _zn.regua_int / 12);
+		var _pulso = .8 + .2 * sin(current_time / 250);
+		var _yy = _zn.regua_y + _sy;
 		var _x1 = _zn.x - 10 + _sx, _x2 = _zn.x + VS_COLS * CEL + 5 + _sx;
 		var _n = 12;
 		var _px = array_create(_n + 1), _py = array_create(_n + 1);

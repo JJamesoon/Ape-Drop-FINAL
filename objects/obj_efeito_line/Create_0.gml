@@ -15,6 +15,7 @@ minha_linha = noone;	//LINHA DOS ANDARES DESSA ARENA
 zx = noone;	//VERSUS: X ONDE COMEÇA A ZONA DESSA LINHA (NOONE = A ARENA INTEIRA)
 zc = noone;	//VERSUS: COLUNAS DA ZONA
 zona = -1;	//VERSUS: QUAL ZONA (0 OU 1)
+regua_y = noone;	//VERSUS: Y DA LINHA DOS ANDARES DESSA ZONA (NO ARCADE A LINHA E O OBJ_LINHA, MINHA_LINHA)
 
 somar = true;	//SOMA NO ANDAR (ANTIGO)
 combo = 0;	//QUANTAS LINHAS FECHARAM JUNTO
@@ -22,6 +23,13 @@ combo = 0;	//QUANTAS LINHAS FECHARAM JUNTO
 criar_chao_combo = false;	//OS BLOCOS DESSA LINHA VIRAM CHAO (A LINHA CONTA PRO ANDAR)
 subir_andar = false; //LINHA DE COR UNICA: SOBE DE ANDAR NO FIM DA ANIMACAO
 chao_y = noone;	//Y (TOPO) DA LINHA QUE VIROU CHAO. NO FIM DO EFEITO, QUALQUER CASA DELA SEM CHAO GANHA UM (EVITA BURACO NO CHAO)
+
+//Y DA LINHA DOS ANDARES: A DA ZONA (VERSUS) OU A DO ARCADE. INFINITY = NAO TEM (NADA VIRA CHAO)
+regua_atual = function()
+{
+	if(regua_y != noone) return regua_y;
+	return minha_linha != noone ? floor(minha_linha.y) : infinity;
+}
 
 //QUEBRA OS BLOCOS DA LINHA EM _Y (O NOME E ANTIGO: ELA NAO CRIA BLOCO)
 criar_bloco = function(_y)
@@ -53,7 +61,7 @@ criar_bloco = function(_y)
 	//ESSA FUNÇAO RODA TODO FRAME ENQUANTO O EFEITO TA ATIVO: SE OS BLOCOS JA FORAM MARCADOS, NAO FAZ NADA
 	if(array_length(_blocos) == 0) exit;
 	//ESSA LINHA VIRA CHAO (MESMA REGRA DO _P.CRIAR_CHAO MAIS ABAIXO): GUARDA PRA CONFERIR O CHAO NO FIM
-	if(criar_chao_combo and minha_linha != noone and _y >= floor(minha_linha.y)) chao_y = _y;
+	if(criar_chao_combo and regua_atual() != infinity and _y >= regua_atual()) chao_y = _y;
 	
 	//IRMANDADE: TODA PEÇA QUE AINDA TAVA INTEIRA NA LINHA E DESTRUIDA POR COMPLETO
 	//(OS BLOCOS DELA QUE ESTAO FORA DA LINHA TAMBEM MORREM). CADA BLOCO DELA MOSTRA +PONTOS_IRMANDADE
@@ -120,7 +128,7 @@ criar_bloco = function(_y)
 	{
 		var _p = _blocos[i];
 		if(!instance_exists(_p)) continue;
-		if(criar_chao_combo and minha_linha != noone) if(_y >= floor(minha_linha.y)) _p.criar_chao = true;
+		if(criar_chao_combo and regua_atual() != infinity) if(_y >= regua_atual()) _p.criar_chao = true;
 		_p.efeito_morte = false;
 		_p.destruido_por = "linha";
 		_p.alpha_fog = 1;

@@ -169,6 +169,16 @@ switch(etapa)
 	#endregion
 
 	#region VERSUS: PODERES POR ESCOLHA
+	case "vs_andar":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 5) { with(obj_area) { zonas[0].espera = 99999; zonas[1].espera = 99999; } log("blocos de chao no inicio=" + string(instance_number(obj_block))); }
+		if(_t == 10) for(var _c = 0; _c < 10; _c++) criar_bloco_solto(136 + 8 + 16 * _c, 48 + 8 + 16 * 18, cores.c_green);
+		if(_t == 100 or _t == 230) { with(obj_area) if(!is_undefined(zonas[0].escolha)) versus_escolha_fechar(0); }
+		if(_t == 140) { var _z = obj_area.zonas[0]; log("apos 1a linha: chao=" + string(_z.chao) + " andar=" + string(_z.andar) + " blocos=" + string(instance_number(obj_block)) + " pecas=" + string(instance_number(obj_peca)) + " (esperado chao 1, andar 1)"); screen_save("teste_a1_chao1.png"); }
+		if(_t == 150) for(var _c = 0; _c < 10; _c++) criar_bloco_solto(136 + 8 + 16 * _c, 48 + 8 + 16 * 17, cores.c_red);
+		if(_t == 330) { var _z = obj_area.zonas[0]; log("apos 2a linha: chao=" + string(_z.chao) + " andar=" + string(_z.andar) + " blocos=" + string(instance_number(obj_block)) + " escolha=" + string(!is_undefined(_z.escolha)) + " (esperado andar 2, chao 0)"); screen_save("teste_a2_andar2.png"); }
+		if(_t == 335) { log("FIM"); game_end(); }
+		break;
 	case "vs_menu":
 		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
 		if(_t == 190) { with(obj_area) versus_recompensa(0, 1); }
