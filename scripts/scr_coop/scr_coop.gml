@@ -51,6 +51,54 @@ function todos_mortos()
 global.coop_vez			= 1;	//DE QUEM E A VEZ (1 OU 2)
 global.coop_vez_aviso	= 0;	//FRAMES ATE PODER AVISAR DE NOVO "NAO E A SUA VEZ"
 
+//==================== COOP: PONTOS DE CADA UM E TOTAL DO TIME ====================
+//GLOBAL.PONTOS_1 CONTINUA SENDO O TOTAL DO TIME (RECORDE, FIM DE JOGO...). GLOBAL.COOP_PTS GUARDA QUANTO CADA UM FEZ [P1, P2], E A SOMA DOS DOIS = TOTAL.
+//PONTO DE ACAO DE UM PLAYER (QUEBRAR BLOCO, MATAR INIMIGO) VAI PRO PLAYER VIVO MAIS PERTO. PONTO DO TIME (LINHA, IRMANDADE, BONUS) E DIVIDIDO IGUAL.
+//DANO TIRA SO DE QUEM LEVOU. COOP_PEND E O QUE AINDA TA VOANDO ATE O HUD (A CAIXA DE CADA UM SO SOBE QUANDO O NUMERO CHEGA, IGUAL AO TOTAL)
+global.coop_pts = [0, 0];
+global.coop_pend = [0, 0];
+
+//ESTAMOS NO COOP? (O VERSUS TAMBEM USA DOIS PLAYERS, MAS COM PLACAR PROPRIO)
+function coop_pontos_ativo()
+{
+	return global.coop and room != rm_versus;
+}
+
+//DE QUEM E UM EVENTO NO PONTO (_X, _Y): 1 OU 2 = O PLAYER VIVO MAIS PERTO, 0 = NINGUEM VIVO (DIVIDE)
+function coop_dono(_x, _y)
+{
+	var _p = player_perto(_x, _y);
+	return _p == noone ? 0 : clamp(_p.jogador, 1, 2);
+}
+
+//DIVIDE UM VALOR ENTRE OS DOIS: _JOG 1 OU 2 = TUDO PRA ELE, 0 = METADE PRA CADA (O QUE SOBRA DE UM PONTO VAI PRO P2). DEVOLVE [P1, P2]
+function coop_dividir(_v, _jog)
+{
+	if(_jog == 1) return [_v, 0];
+	if(_jog == 2) return [0, _v];
+	var _a = _v div 2;
+	return [_a, _v - _a];
+}
+
+//CREDITA PONTOS (_VOA = O NUMERO VAI VOAR ATE O HUD, ENTAO A CAIXA ESPERA ELE CHEGAR)
+function coop_creditar(_v, _jog, _voa)
+{
+	var _d = coop_dividir(_v, _jog);
+	for(var i = 0; i < 2; i++)
+	{
+		global.coop_pts[i] += _d[i];
+		if(_voa) global.coop_pend[i] += _d[i];
+	}
+}
+
+//O NUMERO CHEGOU NO HUD (CHAMADO DEPOIS DE DIMINUIR O PONTOS_PENDENTES)
+function coop_chegou(_v, _jog)
+{
+	var _d = coop_dividir(_v, _jog);
+	for(var i = 0; i < 2; i++) global.coop_pend[i] = max(0, global.coop_pend[i] - _d[i]);
+	if(global.pontos_pendentes <= 0) global.coop_pend = [0, 0]; //(ACERTA QUALQUER SOBRA DE ARREDONDAMENTO)
+}
+
 //COMEÇOU UMA PARTIDA: A VEZ COMEÇA NO PLAYER 1
 function coop_vez_reiniciar()
 {
@@ -1592,10 +1640,11 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	draw_set_font(fnt_hud);
 	draw_set_halign(fa_center);
 	draw_set_valign(fa_middle);
-	var _es = min(1.5, 58 / max(1, string_width(_dados.pontos))) * score_esc;	//ENCOLHE SE O NUMERO FICAR COMPRIDO
+	var _val = _n == 1 ? _dados.p1 : _dados.p2;	//CADA UM MOSTRA O SEU PROPRIO SCORE (O DO TIME FICA NA FAIXA DE BAIXO)
+	var _es = min(1.5, 58 / max(1, string_width(_val))) * score_esc;	//ENCOLHE SE O NUMERO FICAR COMPRIDO
 	var _sc = (score_esc > 1.05) ? c_yellow : c_white;
-	draw_text_transformed_color(_x + 52, _y + 157, _dados.pontos, _es, _es, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_x + 51, _y + 156, _dados.pontos, _es, _es, 0, _sc, _sc, _sc, _sc, 1);
+	draw_text_transformed_color(_x + 52, _y + 157, _val, _es, _es, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_x + 51, _y + 156, _val, _es, _es, 0, _sc, _sc, _sc, _sc, 1);
 
 	//LETRAS A P E D R O P: AS QUE FALTAM FICAM APAGADAS (O DESENHO JA TEM). A QUE PEGOU GANHA A COR E UM "POP"
 	var _cores_l = [ #8BFF32, #FFFF00, #DE65FF, #31FCFF, #FF3237, #8BFF32, #FFFF00];
@@ -1657,7 +1706,8 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	}
 }
 
-//FAIXA DE BAIXO DA MOLDURA (SPR_COOP_CAIXA_BOTTOM, 247X35): LEVEL, HI-SCORE (NO MEIO, MAIS ALTO) E TIME. OS NUMEROS FICAM EMBAIXO DOS NOMES
+//FAIXA DE BAIXO DA MOLDURA (SPR_COOP_CAIXA_BOTTOM, 247X35): LEVEL, TOTAL (NO MEIO, MAIS ALTO) E TIME. OS NUMEROS FICAM EMBAIXO DOS NOMES.
+//O MEIO MOSTRA O TOTAL DO TIME (P1 + P2). A PALAVRA "TOTAL" E DESENHADA AQUI (NA SPRITE A PALAVRA ANTIGA FOI APAGADA)
 function coop_faixa_desenhar(_x, _y, _dados)
 {
 	var _sombra = #0E071B;
@@ -1668,14 +1718,20 @@ function coop_faixa_desenhar(_x, _y, _dados)
 		draw_sprite_ext(spr_coop_caixa_bottom, 0, _x, _y, 1, 1, 0, c_white, febre_mix);
 		gpu_set_fog(false, c_white, 0, 1);
 	}
-	draw_set_font(fnt_mini_hud);
+	//"TOTAL" NO MEIO, NO MESMO ESTILO DAS OUTRAS PALAVRAS (BRANCO COM SOMBRA ESCURA)
+	draw_set_font(fnt_hud);
 	draw_set_halign(fa_center);
 	draw_set_valign(fa_middle);
-	var _vals = [[_x + 49, _y + 22, string(global.level)], [_x + 123, _y + 19, _dados.hi], [_x + 197, _y + 22, _dados.tempo]];
+	var _azul = #003E66;
+	draw_text_transformed_color(_x + 124, _y + 11.5, "TOTAL", .75, .75, 0, _azul, _azul, _azul, _azul, 1);
+	draw_text_transformed_color(_x + 123, _y + 10.5, "TOTAL", .75, .75, 0, c_white, c_white, c_white, c_white, 1);
+	draw_set_font(fnt_mini_hud);
+	var _vals = [[_x + 49, _y + 22, string(global.level)], [_x + 123, _y + 19, _dados.pontos], [_x + 197, _y + 22, _dados.tempo]];
 	for(var i = 0; i < 3; i++)
 	{
-		draw_text_transformed_color(_vals[i][0] + 1, _vals[i][1] + 1, _vals[i][2], 1, 1, 0, _sombra, _sombra, _sombra, _sombra, 1);
-		draw_text_transformed_color(_vals[i][0], _vals[i][1], _vals[i][2], 1, 1, 0, c_white, c_white, c_white, c_white, 1);
+		var _ev = min(1, 52 / max(1, string_width(_vals[i][2])));	//ENCOLHE SE O NUMERO FICAR COMPRIDO
+		draw_text_transformed_color(_vals[i][0] + 1, _vals[i][1] + 1, _vals[i][2], _ev, _ev, 0, _sombra, _sombra, _sombra, _sombra, 1);
+		draw_text_transformed_color(_vals[i][0], _vals[i][1], _vals[i][2], _ev, _ev, 0, c_white, c_white, c_white, c_white, 1);
 	}
 }
 
@@ -1713,10 +1769,18 @@ function coop_hud_desenhar()
 	pontos_mostrado = lerp(pontos_mostrado, _alvo, .2);
 	if(abs(pontos_mostrado - _alvo) < 1) pontos_mostrado = _alvo;
 	score_esc = lerp(score_esc, 1, .15);
+	//SCORE INDIVIDUAL DE CADA UM (TAMBEM SOBE SUAVE E SO QUANDO O NUMERO CHEGA)
+	if(!variable_instance_exists(id, "pm1")) { pm1 = 0; pm2 = 0; }
+	var _a1 = max(0, global.coop_pts[0] - global.coop_pend[0]), _a2 = max(0, global.coop_pts[1] - global.coop_pend[1]);
+	pm1 = lerp(pm1, _a1, .2);
+	pm2 = lerp(pm2, _a2, .2);
+	if(abs(pm1 - _a1) < 1) pm1 = _a1;
+	if(abs(pm2 - _a2) < 1) pm2 = _a2;
 	var _seg = floor(global.tempo_partida);
 	var _dados = {
 		pontos : string(round(pontos_mostrado)),
-		hi : string(instance_exists(obj_game_control) ? max(obj_game_control.recorde_inicio, round(pontos_mostrado)) : recorde_atual()),
+		p1 : string(round(pm1)),
+		p2 : string(round(pm2)),
 		tempo : string_replace_all(string_format(_seg div 60, 2, 0), " ", "0") + ":" + string_replace_all(string_format(_seg mod 60, 2, 0), " ", "0")
 	};
 	var _cara = 0;

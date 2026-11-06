@@ -158,6 +158,7 @@ switch(modo)
 			if(point_distance(x, y, _alvo_x, _alvo_y) < max(8, vel_voo) or timer_voo > room_speed * 3)
 			{
 				global.pontos_pendentes = max(0, global.pontos_pendentes - valor);
+				if(coop_pontos_ativo()) coop_chegou(valor, jog);
 				with(obj_borda) score_esc = 1.35 + min(other.valor / 4000, .5); //TOTAL GRANDE = PULO MAIOR
 				som_tocar(snd_menu_select_02, .1);
 				instance_destroy();

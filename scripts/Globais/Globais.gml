@@ -50,6 +50,8 @@ function restart_globais()
 	
 	global.pontos_1		= 0;	//PONTOS DA PARTIDA
 	global.pontos_pendentes = 0;	//PONTOS QUE AINDA TAO VOANDO ATE O HUD (O PLACAR SO SOBE QUANDO CHEGAM)
+	global.coop_pts = [0, 0];		//COOP: PONTOS INDIVIDUAIS [P1, P2] (A SOMA DOS DOIS E O PONTOS_1 = TOTAL DO TIME)
+	global.coop_pend = [0, 0];		//COOP: DE CADA UM, O QUE AINDA TA VOANDO ATE O HUD
 	global.coletor = noone;			//QUADRO DE PONTOS NO MEIO DA TELA
 	global.evento_linha = 0;		//CONTA OS FECHAMENTOS DE LINHA (CADA UM TEM O SEU QUADRO)
 	//PLAYER 1--------------------

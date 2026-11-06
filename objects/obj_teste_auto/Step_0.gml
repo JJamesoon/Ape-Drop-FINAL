@@ -126,6 +126,29 @@ switch(etapa)
 		break;
 	#endregion
 
+	#region COOP: SCORE DE CADA UM + TOTAL NA FAIXA DE BAIXO
+	case "pontos_coop":
+		if(_t == 2)
+		{
+			if(room != rm_coop) { global.coop = true; room_goto(rm_coop); exit; }
+			_limpar();
+			global.zq = undefined; global.gorz_trava = false; global.gorz_intro = false;
+			var _k = 0;
+			with(obj_player) { x = obj_area.x + 80 + 140 * _k; y = obj_area.y + 200; velh = 0; velv = 0; estado = state.idle; _k++; }
+			global.pontos_1 = 0; global.coop_pts = [0, 0]; global.coop_pend = [0, 0]; global.pontos_pendentes = 0;
+		}
+		if(_t == 10) pontos_somar(100, player_n(1).x, player_n(1).y - 20);
+		if(_t == 12) pontos_somar(250, player_n(2).x, player_n(2).y - 20);
+		if(_t == 14) pontos_somar(40, obj_area.x + 150, obj_area.y + 60, c_yellow, 1, 0);
+		if(_t == 20) log("apos ganhos: P1=" + string(global.coop_pts[0]) + " P2=" + string(global.coop_pts[1]) + " total=" + string(global.pontos_1) + " (esperado 120 / 270 / 390)");
+		if(_t == 240) screen_save("teste_c1_pontos.png");
+		if(_t == 241) { player_n(2).dano_cobrar(); log("P2 levou dano: P1=" + string(global.coop_pts[0]) + " P2=" + string(global.coop_pts[1]) + " total=" + string(global.pontos_1) + " (esperado 120 / 0 / 120)"); }
+		if(_t == 243) { var _v = player_n(2).vida_atual; player_n(2).dano_cobrar(); log("P2 sem pontos levou dano de novo: vida antes=" + string(_v) + " depois=" + string(player_n(2).vida_atual) + " P1=" + string(global.coop_pts[0]) + " (IMORTAL protege coracao; P1 tem que seguir 120)"); }
+		if(_t == 244) { player_n(1).dano_cobrar(); log("P1 levou dano: P1=" + string(global.coop_pts[0]) + " total=" + string(global.pontos_1) + " (esperado 0 / 0)"); }
+		if(_t == 300) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
 	case "jcoop":
 		if(_t == 2)

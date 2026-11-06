@@ -218,6 +218,9 @@ function pontos_somar(_pontos, _x, _y, _cor = c_yellow, _esc = 1, _dono = -1)
 		var _zz = versus_zona_x(_x);
 		_jog = _dono > 0 ? _dono : (_zz >= 0 ? versus_pontos_de(_zz) : 1);
 	}
+	//COOP: O TOTAL DO TIME FICA NO PONTOS_1 E CADA UM TEM O SEU (_DONO = 0 FALA "PONTO DO TIME": DIVIDE; SEM DONO, VAI PRO PLAYER MAIS PERTO DO PONTO)
+	var _cj = 0;
+	if(coop_pontos_ativo()) _cj = _dono > 0 ? _dono : (_dono == 0 ? 0 : coop_dono(_x, _y));
 	if(_jog == 2)	global.pontos_2		+= _pontos;
 	else			global.pontos_1		+= _pontos;
 	
@@ -227,13 +230,27 @@ function pontos_somar(_pontos, _x, _y, _cor = c_yellow, _esc = 1, _dono = -1)
 	{
 		_e.modo = "voar";
 		_e.valor = _pontos;
+		_e.jog = _cj;
 		global.pontos_pendentes += _pontos;
 	}
+	if(coop_pontos_ativo()) coop_creditar(_pontos, _cj, modo_arcade() and instance_exists(obj_borda));
 }
 
 //TIRA PONTOS (BLOCO QUEBRADO PELOS ESPINHOS DO QUEBRA-CABEÇA): NUMERO VERMELHO. O PLACAR NAO FICA NEGATIVO
-function pontos_tirar(_pontos, _x, _y)
+//NO COOP TIRA DO PLAYER _JOG (OU, SEM ELE, DO MAIS PERTO; SE ELE NAO TEM NADA, DO OUTRO). O TOTAL DO TIME CAI JUNTO
+function pontos_tirar(_pontos, _x, _y, _jog = -1)
 {
+	if(coop_pontos_ativo())
+	{
+		var _cj = _jog > 0 ? _jog : max(1, coop_dono(_x, _y));
+		if(_jog <= 0 and global.coop_pts[_cj - 1] <= 0) _cj = 3 - _cj;
+		_pontos = min(round(_pontos), global.coop_pts[_cj - 1]);
+		if(_pontos <= 0) exit;
+		global.coop_pts[_cj - 1] -= _pontos;
+		global.pontos_1 -= _pontos;
+		efeito_texto("-" + string(_pontos), _x, _y, c_red, .8);
+		exit;
+	}
 	_pontos = min(round(_pontos), global.pontos_1);
 	if(_pontos <= 0) exit;
 	global.pontos_1 -= _pontos;
@@ -283,6 +300,7 @@ function coletor_somar(_c, _pontos)
 {
 	global.pontos_1 += _pontos;
 	global.pontos_pendentes += _pontos;
+	if(coop_pontos_ativo()) coop_creditar(_pontos, 0, true);	//(LINHA, IRMANDADE E BONUS SAO DO TIME: METADE PRA CADA)
 	_c.total_real += _pontos;
 }
 
@@ -316,7 +334,7 @@ function pontos_irmandade(_x, _y, _espera = 0, _c = noone, _reservado = false)
 {
 	if(!modo_arcade() or !instance_exists(obj_borda))
 	{
-		pontos_somar(PONTOS_IRMANDADE, _x, _y);
+		pontos_somar(PONTOS_IRMANDADE, _x, _y, c_yellow, 1, 0);
 		exit;
 	}
 	if(!instance_exists(_c) or _c.modo != "coletor" or _c.fase != "recebendo")
@@ -374,7 +392,7 @@ function especial_ativar(_x, _y, _premio = -1)
 	switch(_premio)
 	{
 		case 0: //BOM: PONTOS
-			pontos_somar(PONTOS_ESPECIAL * global.level, _x, _y, c_aqua, 1.4);
+			pontos_somar(PONTOS_ESPECIAL * global.level, _x, _y, c_aqua, 1.4, 0);
 			break;
 		case 1: //BOM: PEÇAS DEVAGAR
 			global.efeito_lento = room_speed * 8;

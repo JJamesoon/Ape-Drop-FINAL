@@ -842,9 +842,9 @@ function teclas_desenhar()
 #macro GORZ_INICIO_S	.4					//SEGUNDOS DE PARTIDA ATE ELE SE APRESENTAR (NO COMEÇO: A 1A PEÇA SO NASCE QUANDO ELE SOME)
 #macro GORZ_ANG			16					//INCLINAÇAO DA FAIXA E DO TEXTO (GRAUS, SOBE PRA DIREITA)
 #macro GORZ_FAIXA_C		190					//COMPRIMENTO DA FAIXA ESCURA (PX DA ROOM)
-#macro GORZ_FAIXA_ESP	66					//ESPESSURA DA FAIXA
-#macro GORZ_TEXTO_W		158					//LARGURA MAXIMA DO TEXTO NA FAIXA
-#macro GORZ_TEXTO_H		48					//ALTURA MAXIMA DO TEXTO NA FAIXA
+#macro GORZ_FAIXA_ESP	84					//ESPESSURA DA FAIXA
+#macro GORZ_TEXTO_W		164					//LARGURA MAXIMA DO TEXTO NA FAIXA
+#macro GORZ_TEXTO_H		66					//ALTURA MAXIMA DO TEXTO NA FAIXA
 #macro GORZ_ESC_CABECA	1.5					//TAMANHO DA CABEÇA (A SPRITE TEM 100X100)
 #macro GORZ_LINHAS_N	46					//QUANTAS LINHAS DE VELOCIDADE
 #macro GORZ_LINHAS_X	240					//AS LINHAS SO APARECEM ATE ESSE X (NUNCA COBREM A ARENA)
@@ -964,7 +964,7 @@ function gorz_montar(_txt)
 	draw_set_font(fnt_hud);
 	var _base = string_height("A");
 	var _esp = max(string_width(" "), 3);
-	var _escs = [1.5, 1.3, 1.15, 1, .9, .8, .7];
+	var _escs = [1.9, 1.7, 1.55, 1.4, 1.25, 1.1, 1, .9];
 	var _linhas = [], _alt = 0, _s = .7;
 	for(var e = 0; e < array_length(_escs); e++)
 	{
@@ -1216,7 +1216,7 @@ function gorz_desenhar()
 	gorz_cabeca(_hx, _hy, _e, GORZ_ESC_CABECA, _sq, _cor, _al);
 
 	//FAIXA ESCURA INCLINADA: VEM DE BAIXO ESQUERDA ANDANDO NA PROPRIA DIAGONAL (A ENTRADA PASSA UM POUCO E VOLTA)
-	var _ox = 34 - _ux * _fora * 280, _oy = 340 - _uy * _fora * 280;
+	var _ox = 34 - _ux * _fora * 280, _oy = 322 - _uy * _fora * 280;
 	var _L = GORZ_FAIXA_C, _T = GORZ_FAIXA_ESP;
 	var _escuro = #122020;	//A MESMA COR DA CAIXA DO NOME NA SPRITE
 	var _faixa = [[0, 0], [_L, 0], [_L - 14, _T], [14, _T]];

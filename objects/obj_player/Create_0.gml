@@ -131,9 +131,11 @@ timer_morte = 0;	//TEMPO DESDE QUE MORREU (ANIMAÇAO DE MORTE)
 #macro DANO_PONTOS	800
 dano_cobrar = function()
 {
-	if(modo_arcade() and !modo_versus() and global.pontos_1 > 0)
+	//NO COOP CADA UM PERDE OS SEUS PONTOS (SE OS DELE ACABARAM, PERDE CORAÇAO MESMO QUE O OUTRO TENHA PONTOS)
+	var _meus = coop_pontos_ativo() ? global.coop_pts[clamp(jogador, 1, 2) - 1] : global.pontos_1;
+	if(modo_arcade() and !modo_versus() and _meus > 0)
 	{
-		pontos_tirar(DANO_PONTOS, x, bbox_top - 14); //(NO MODO IMORTAL OS PONTOS TAMBEM CAEM: SO OS CORAÇOES FICAM PROTEGIDOS)
+		pontos_tirar(DANO_PONTOS, x, bbox_top - 14, jogador); //(NO MODO IMORTAL OS PONTOS TAMBEM CAEM: SO OS CORAÇOES FICAM PROTEGIDOS)
 		return;
 	}
 	if(IMORTAL) exit; //MODO DE TESTE: LEVA O DANO (EMPURRAO) MAS NAO PERDE CORAÇAO

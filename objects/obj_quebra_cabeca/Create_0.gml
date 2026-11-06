@@ -63,7 +63,7 @@ terminar = function(_venceu)
 	//VENCEU: BONUS (VEZES O LEVEL), TEXTO, SOM E ONDA DE CHOQUE
 	if(_venceu)
 	{
-		pontos_somar(QC_BONUS * global.level, _cx, _cy + 30, c_yellow, 1.3);
+		pontos_somar(QC_BONUS * global.level, _cx, _cy + 30, c_yellow, 1.3, 0);
 		desafio_premio_letra(_cx, _cy + 6);
 		efeito_texto(global.linguagem == 0 ? "CUBO COMPLETO!" : "CUBE SOLVED!", _cx, _cy + 10, c_yellow, 1.4);
 		som_tocar(snd_new_level);
