@@ -205,7 +205,7 @@ function borda_desenhar(_spr, _frame, _x, _y, _extra, _alpha = 1)
 #macro VS_COMBO_TEMPO		(room_speed * 4)	//TEMPO PRA EMENDAR OUTRA LINHA NO COMBO DA ZONA
 #macro VS_MAX_ATAQUES		6		//BLOCOS PENDENTES NA FILA DE QUEM RECEBE (PODER NAO USA SE A FILA ESTA CHEIA)
 #macro VS_ESCOLHA_S		5		//SEGUNDOS PRA ESCOLHER O PODER (O JOGO DE QUEM FECHOU A LINHA FICA PARADO)
-#macro VS_ESCOLHA_ATRASO	28		//FRAMES ATE O MENU APARECER DEPOIS DE FECHAR A LINHA (DEIXA A LINHA EXPLODIR)
+#macro VS_ESCOLHA_ATRASO	0		//FRAMES ATE O MENU APARECER DEPOIS DE FECHAR A LINHA (APARECE NA HORA)
 #macro VS_COR_P1			#4D7CFF		//AZUL (O LADO ESQUERDO)
 #macro VS_COR_P2			#FF553A		//VERMELHO (O LADO DIREITO)
 
@@ -1908,11 +1908,11 @@ function coop_hud_desenhar()
 //==================== VERSUS: PODERES POR ESCOLHA ====================
 //FECHAR LINHA DA UMA ESCOLHA: O JOGO DE QUEM FECHOU PARA POR ATE VS_ESCOLHA_S SEGUNDOS (O DO ADVERSARIO CONTINUA), APARECEM 3 OPÇOES NO MEIO
 //DA ARENA, E A ESCOLHIDA FICA GUARDADA NUMA DAS 4 CAIXAS. DEPOIS E SO APERTAR A TECLA DA CAIXA (P1: 1 2 3 4 / P2: NUM 5 6 7 8).
-//O QUE APARECE DEPENDE DO ANDAR DE QUEM FECHOU A LINHA (O ANDAR SOBE COMO NO ARCADE: O CHAO SOBE ATE A LINHA DOS ANDARES) E DO COMBO:
-//	ANDAR 1: ESPECIAL (PRA VOCE), INIMIGO PATRULHEIRO, RAIVOSO		ANDAR 2: ELETRICO (PRA VOCE), PEDRA, BURACO NEGRO, LASER
-//	ANDAR 3: BOMBA, CABEÇADA, SNIPER, ABELHAS, FANTASMA				COMBO DE 3 LINHAS: GELATINA, GELO, CHUVA DE PEÇAS, PEÇAS DUPLAS
-//OS PODERES "PRA VOCE" NASCEM NA PROPRIA ARENA; OS OUTROS, NA DO ADVERSARIO. LINHAS FECHADAS AINDA CANCELAM ATAQUES QUE ESTAVAM CHEGANDO.
-//(AINDA NAO TEM: O MINIJOGO QUE O NIVEL 3 DA NA 5A LINHA. A CONTA JA ESTA EM LIN3)
+//O QUE APARECE E SORTEADO: SEMPRE 3 OPÇOES, 2 DE ATAQUE (VAO PRA ARENA DO ADVERSARIO) E 1 DE AJUDA (NASCE NA PROPRIA ARENA), EM ORDEM ALEATORIA.
+//	ATAQUE: PATRULHEIRO, RAIVOSO, PEDRA, BURACO NEGRO, LASER, BOMBA, CABEÇADA, SNIPER, ABELHAS, FANTASMA, GELATINA, GELO, CHUVA DE PEÇAS, PEÇAS DUPLAS
+//	AJUDA: VELOCIDADE (O BLOCO LENTO: AO QUEBRAR, VOCE FICA RAPIDO), ELETRICO (RAIO: PONTOS EM DOBRO)
+//LINHAS FECHADAS AINDA CANCELAM ATAQUES QUE ESTAVAM CHEGANDO. O ANDAR (CHAO SUBINDO ATE A LINHA DOS ANDARES, COMO NO ARCADE) NAO MUDA AS OPÇOES.
+//(AINDA NAO TEM: O MINIJOGO QUE O ANDAR 3 DA NA 5A LINHA. A CONTA JA ESTA EM LIN3)
 
 //ALTURAS DA LINHA DOS ANDARES (EM CASAS, DO CHAO): ANDAR 1 = 2, ANDAR 2 = 6, ANDAR 3 = 10 (IGUAL AO ARCADE)
 //Y DA LINHA DOS ANDARES DA ZONA _Z (ONDE O CHAO TEM QUE CHEGAR PRA SUBIR DE ANDAR)
@@ -1960,16 +1960,14 @@ function versus_tecla_slot(_n, _i)
 	return _n == 1 ? ord("1") + _i : vk_numpad5 + _i;
 }
 
-//OPÇOES QUE O NIVEL (OU O COMBO) OFERECE
-function versus_pool(_nivel, _combo)
+//OPÇOES DE ATAQUE E DE AJUDA (NOMES DO DEBUG_LISTA_BLOCOS, MAIS "Chuva" E "Duplas")
+function versus_pool_ataque()
 {
-	if(_combo) return ["Gelatina", "Gelo", "Chuva", "Duplas"];
-	switch(_nivel)
-	{
-		case 1: return ["Especial", "Inimigo", "Raivoso"];
-		case 2: return ["Raio", "Pedra", "Buraco", "LaserLado"];
-	}
-	return ["Bomba", "Cabecudo", "Sniper", "Colmeia", "Fantasma"];
+	return ["Inimigo", "Raivoso", "Pedra", "Buraco", "LaserLado", "Bomba", "Cabecudo", "Sniper", "Colmeia", "Fantasma", "Gelatina", "Gelo", "Chuva", "Duplas"];
+}
+function versus_pool_ajuda()
+{
+	return ["Lento", "Raio"];
 }
 
 //DADOS DE UMA OPÇAO: { NOME, DESC (2 LINHAS), EU (AJUDA QUEM USA), ICONE }. OS NOMES SAO OS DO DEBUG_LISTA_BLOCOS (+ "Chuva" E "Duplas")
@@ -1979,7 +1977,7 @@ function versus_opcao_info(_id)
 	var _n = [_id, _id], _d = ["", ""], _eu = false;
 	switch(_id)
 	{
-		case "Especial":	_n = ["ESPECIAL", "SPECIAL"];			_d = ["BLOCO COM PREMIO SURPRESA\nNA SUA ARENA", "BLOCK WITH A SURPRISE PRIZE\nIN YOUR ARENA"]; _eu = true; break;
+		case "Lento":		_n = ["VELOCIDADE", "SPEED"];			_d = ["QUEBRE O BLOCO NA SUA ARENA\nE FIQUE RAPIDO", "BREAK THE BLOCK IN YOUR ARENA\nAND GET FAST"]; _eu = true; break;
 		case "Inimigo":		_n = ["PATRULHEIRO", "PATROL"];			_d = ["INIMIGO QUE PATRULHA A\nARENA DO ADVERSARIO", "ENEMY THAT PATROLS THE\nOPPONENT'S ARENA"]; break;
 		case "Raivoso":		_n = ["RAIVOSO", "ANGRY"];				_d = ["PEÇA QUE CAI DIRETO NA\nARENA DO ADVERSARIO", "PIECE THAT DROPS STRAIGHT\nIN THE OPPONENT'S ARENA"]; break;
 		case "Raio":		_n = ["ELETRICO", "ELECTRIC"];			_d = ["RAIO NA SUA ARENA:\nPONTOS EM DOBRO", "LIGHTNING IN YOUR ARENA:\nDOUBLE POINTS"]; _eu = true; break;
@@ -2018,15 +2016,13 @@ function versus_icone_desenhar(_id, _x, _y, _esc, _a = 1)
 	bloco_icone_desenhar(versus_opcao_info(_id).icone, _x, _y, _esc, false, _a);
 }
 
-//_Z FECHOU _N LINHAS: GANHA UM MENU DE ESCOLHA (DE COMBO SE JA ESTA NO COMBO DE 3)
+//_Z FECHOU _N LINHAS: GANHA UM MENU DE ESCOLHA
 function versus_recompensa(_z, _n)
 {
 	var _zn = zonas[_z];
-	var _combo = _zn.combo >= 3;
-	if(_combo) _zn.combo = 0;
 	if(_zn.andar >= 3) _zn.lin3 += _n;
 	if(array_length(_zn.recompensas) >= 3) return; //(MUITA COISA NA FILA: IGNORA)
-	array_push(_zn.recompensas, { nivel : _zn.andar, combo : _combo });
+	array_push(_zn.recompensas, {});
 	if(is_undefined(_zn.escolha) and _zn.escolha_atraso <= 0) _zn.escolha_atraso = VS_ESCOLHA_ATRASO;
 }
 
@@ -2063,23 +2059,30 @@ function versus_poderes_atualizar(_z)
 	if(_ok) versus_escolha_fechar(_z);
 }
 
-//ABRE O MENU: SORTEIA 3 OPÇOES DO NIVEL E PARA O JOGO DESSA ARENA
+//ABRE O MENU: SORTEIA 3 OPÇOES (2 DE ATAQUE E 1 DE AJUDA, EM ORDEM ALEATORIA) E PARA O JOGO DESSA ARENA
 function versus_escolha_abrir(_z)
 {
 	var _zn = zonas[_z];
-	var _r = _zn.recompensas[0];
-	var _pool = versus_pool(_r.nivel, _r.combo);
+	var _ataques = versus_pool_ataque();
 	var _op = [];
-	while(array_length(_op) < min(3, array_length(_pool)))
+	while(array_length(_op) < 2)
 	{
-		var _c = _pool[irandom(array_length(_pool) - 1)];
+		var _c = _ataques[irandom(array_length(_ataques) - 1)];
 		if(!array_contains(_op, _c)) array_push(_op, _c);
 	}
-	_zn.escolha = { opcoes : _op, sel : 0, t : room_speed * VS_ESCOLHA_S, tot : room_speed * VS_ESCOLHA_S, combo : _r.combo, nivel : _r.nivel };
+	var _ajudas = versus_pool_ajuda();
+	array_push(_op, _ajudas[irandom(array_length(_ajudas) - 1)]);
+	//EMBARALHA (A AJUDA NAO FICA SEMPRE NA MESMA POSIÇAO)
+	for(var i = array_length(_op) - 1; i > 0; i--)
+	{
+		var _k = irandom(i);
+		var _tmp = _op[i]; _op[i] = _op[_k]; _op[_k] = _tmp;
+	}
+	_zn.escolha = { opcoes : _op, sel : 0, t : room_speed * VS_ESCOLHA_S, tot : room_speed * VS_ESCOLHA_S };
 	var _p = player_n(_z + 1);
 	if(_p != noone) { _p.vs_parado = true; _p.velh = 0; }
 	som_tocar(snd_jingle_poder, .05);
-	efeito_texto(_r.combo ? "COMBO!" : (global.linguagem == 0 ? "ESCOLHA!" : "PICK ONE!"), _zn.x + VS_COLS * CEL / 2, y + 40, _r.combo ? c_aqua : c_yellow, 1.3);
+	efeito_texto(global.linguagem == 0 ? "ESCOLHA!" : "PICK ONE!", _zn.x + VS_COLS * CEL / 2, y + 40, c_yellow, 1.3);
 }
 
 //CONFIRMOU: GUARDA O PODER NUMA CAIXA (SE TODAS ESTAO CHEIAS, SUBSTITUI O MAIS ANTIGO) E O JOGO VOLTA

@@ -61,8 +61,13 @@ if(sou_fujao and destruido_por != noone and !_sem_premio) moeda_criar(x, y, FUJA
 
 //BLOCO LENTO: QUEBRADO PELO PLAYER (GIRO, ESPECIAL...) NAO ACONTECE NADA. DESTRUIDO DE OUTRO JEITO (LINHA, LASER, BOMBA...),
 //JOGA O FEITIÇO DE LENTIDAO NO PLAYER (A ABELHA E O BURACO TAMBEM NAO CONTAM)
-if(sou_lento and destruido_por != noone and destruido_por != "player" and destruido_por != "especial" and !_armadilha) lento_lancar(x, y);
-if(sou_lento and destruido_por == "player") rapido_lancar(x, y); //O PLAYER QUEBROU: GANHA VELOCIDADE
+//VERSUS: O BLOCO DE VELOCIDADE (PODER) SEMPRE DEIXA O DONO DA ARENA RAPIDO, DO JEITO QUE QUEBRAR
+if(sou_lento and room == rm_versus and destruido_por != noone) rapido_lancar(x, y);
+else
+{
+	if(sou_lento and destruido_por != noone and destruido_por != "player" and destruido_por != "especial" and !_armadilha) lento_lancar(x, y);
+	if(sou_lento and destruido_por == "player") rapido_lancar(x, y); //O PLAYER QUEBROU: GANHA VELOCIDADE
+}
 
 //MODO BONUS (BLOCO ESPECIAL): TODO BLOCO DESTRUIDO SOLTA UMA MOEDA
 if(global.bonus_moedas > 0 and destruido_por != noone and !_sem_premio and modo_arcade()) moeda_criar(x, y, 1);

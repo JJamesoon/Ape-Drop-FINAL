@@ -169,6 +169,45 @@ switch(etapa)
 	#endregion
 
 	#region VERSUS: PODERES POR ESCOLHA
+	case "vs_lento":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 10) { obj_area.zonas[0].ajudas = ["Lento"]; }
+		if(_t == 20) { with(obj_area) versus_limpar_linhas(0, [17]); }
+		if(_t == 21) { var _z = obj_area.zonas[0]; log("menu logo apos fechar a linha: aberto=" + string(!is_undefined(_z.escolha)) + " (esperado 1 em ~1 frame)"); }
+		if(_t == 24) { var _z = obj_area.zonas[0]; log("4 frames depois: aberto=" + string(!is_undefined(_z.escolha))); with(obj_area) if(!is_undefined(zonas[0].escolha)) versus_escolha_fechar(0); }
+		if(_t == 520) { var _n = 0; with(obj_peca) if(sou_lento) { _n++; destruido_por = "linha"; instance_destroy(); } log("blocos lento=" + string(_n)); }
+		if(_t == 525) { log("P1 rapido=" + string(player_n(1).rapido) + " lento=" + string(player_n(1).lento) + " | P2 rapido=" + string(player_n(2).rapido) + " lento=" + string(player_n(2).lento) + " (esperado P1 rapido>0, P2 zerado)"); log("FIM"); game_end(); }
+		break;
+	case "vs_aleat":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 10)
+		{
+			var _ruins = 0, _pos = [0, 0, 0], _lento = 0, _raio = 0, _tipos = {};
+			with(obj_area)
+			{
+				var _aj = versus_pool_ajuda(), _at = versus_pool_ataque();
+				for(var _i = 0; _i < 600; _i++)
+				{
+					zonas[0].recompensas = [{}];
+					versus_escolha_abrir(0);
+					var _o = zonas[0].escolha.opcoes, _na = 0, _nh = 0, _ph = -1;
+					for(var _k = 0; _k < 3; _k++)
+					{
+						if(array_contains(_aj, _o[_k])) { _nh++; _ph = _k; } else if(array_contains(_at, _o[_k])) _na++;
+						if(variable_struct_exists(_tipos, _o[_k])) _tipos[$ _o[_k]]++; else _tipos[$ _o[_k]] = 1;
+					}
+					if(_na != 2 or _nh != 1 or array_length(_o) != 3 or (_o[0] == _o[1]) or (_o[1] == _o[2]) or (_o[0] == _o[2])) _ruins++;
+					_pos[_ph]++;
+					if(_o[_ph] == "Lento") _lento++; else _raio++;
+					zonas[0].escolha = undefined;
+				}
+			}
+			with(obj_player) vs_parado = false;
+			log("600 menus: invalidos=" + string(_ruins) + " posicao da ajuda=" + string(_pos) + " velocidade=" + string(_lento) + " eletrico=" + string(_raio));
+			log("frequencia: " + json_stringify(_tipos));
+			log("FIM"); game_end();
+		}
+		break;
 	case "vs_andar":
 		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
 		if(_t == 5) { with(obj_area) { zonas[0].espera = 99999; zonas[1].espera = 99999; } log("blocos de chao no inicio=" + string(instance_number(obj_block))); }
@@ -198,7 +237,7 @@ switch(etapa)
 		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
 		if(_t == 10)
 		{
-			log("pools: n1=" + string(versus_pool(1, false)) + " n2=" + string(versus_pool(2, false)) + " n3=" + string(versus_pool(3, false)) + " combo=" + string(versus_pool(1, true)) + " nivel agora=" + string(versus_nivel()));
+			log("pool ataque=" + string(versus_pool_ataque()) + " ajuda=" + string(versus_pool_ajuda()));
 			with(obj_area) versus_recompensa(0, 1);
 		}
 		if(_t == 70) screen_save("teste_w1_menu.png");
