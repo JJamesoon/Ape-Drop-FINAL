@@ -168,6 +168,38 @@ switch(etapa)
 		break;
 	#endregion
 
+	#region VERSUS: PODERES POR ESCOLHA
+	case "vs_ajuda":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 10) { obj_area.zonas[0].ajudas = ["Raio", "Especial"]; obj_area.zonas[1].ataques = ["Buraco", "LaserLado", "Colmeia", "Fantasma", "Sniper", "Bomba", "Cabecudo", "Pedra"]; }
+		if(_t == 400) { log("pecas=" + string(instance_number(obj_peca)) + " raio=" + string(instance_exists(obj_peca) ? 1 : 0)); with(obj_peca) { destruido_por = "player"; instance_destroy(); } }
+		if(_t == 460) { screen_save("teste_w5_depois.png"); log("pontos P1=" + string(global.pontos_1) + " P2=" + string(global.pontos_2) + " FIM"); game_end(); }
+		break;
+	case "vs_poderes":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 10)
+		{
+			log("pools: n1=" + string(versus_pool(1, false)) + " n2=" + string(versus_pool(2, false)) + " n3=" + string(versus_pool(3, false)) + " combo=" + string(versus_pool(1, true)) + " nivel agora=" + string(versus_nivel()));
+			with(obj_area) versus_recompensa(0, 1);
+		}
+		if(_t == 70) screen_save("teste_w1_menu.png");
+		if(_t == 72) { var _z = obj_area.zonas[0]; log("menu aberto=" + string(!is_undefined(_z.escolha)) + " opcoes=" + string(is_undefined(_z.escolha) ? [] : _z.escolha.opcoes) + " vs_parado=" + string(player_n(1).vs_parado) + " zona2 parada=" + string(!is_undefined(obj_area.zonas[1].escolha))); }
+		if(_t == 75) { with(obj_area) { zonas[0].escolha.sel = 1; versus_escolha_fechar(0); } }
+		if(_t == 77) { var _z = obj_area.zonas[0]; log("apos escolher: slots=" + string(_z.slots) + " vs_parado=" + string(player_n(1).vs_parado) + " menu=" + string(!is_undefined(_z.escolha))); }
+		//COMBO: SEGUNDA ESCOLHA, DE COMBO
+		if(_t == 80) { with(obj_area) { zonas[0].combo = 3; versus_recompensa(0, 1); } }
+		if(_t == 140) { with(obj_area) { versus_escolha_fechar(0); } with(obj_area) { zonas[0].combo = 3; versus_recompensa(0, 1); } }
+		if(_t == 200) { screen_save("teste_w2_combo.png"); with(obj_area) { versus_escolha_fechar(0); } }
+		if(_t == 205) { var _z = obj_area.zonas[0]; log("slots depois do combo=" + string(_z.slots)); }
+		//USAR OS PODERES: P1 MANDA O 1o PRA P2 (OU PRA SI)
+		if(_t == 210) { with(obj_area) { versus_poder_usar(1, 0); versus_poder_usar(1, 1); versus_poder_usar(1, 2); } }
+		if(_t == 212) { var _a = obj_area.zonas; log("filas: P1 ajudas=" + string(_a[0].ajudas) + " P1 ataques=" + string(_a[0].ataques) + " | P2 ataques=" + string(_a[1].ataques) + " P2 chuva=" + string(_a[1].chuva) + " duplas=" + string(_a[1].duplas) + " | slots P1=" + string(_a[0].slots)); }
+		if(_t == 215) screen_save("teste_w3_usados.png");
+		if(_t == 330) { screen_save("teste_w4_spawn.png"); log("pecas na room=" + string(instance_number(obj_peca)) + " inimigos=" + string(instance_number(obj_inimigo))); }
+		if(_t == 335) { log("FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
 	case "jcoop":
 		if(_t == 2)

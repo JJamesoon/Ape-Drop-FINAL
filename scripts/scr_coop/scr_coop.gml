@@ -203,10 +203,14 @@ function borda_desenhar(_spr, _frame, _x, _y, _extra, _alpha = 1)
 #macro VS_QUEDA_FIM			.27		//...E NO FIM DA RAMPA
 #macro VS_RAMPA_S			200		//SEGUNDOS ATE O FIM DA RAMPA
 #macro VS_COMBO_TEMPO		(room_speed * 4)	//TEMPO PRA EMENDAR OUTRA LINHA NO COMBO DA ZONA
-#macro VS_MAX_ATAQUES		4		//ATAQUES PENDENTES NA FILA DE QUEM RECEBE (O RESTO E IGNORADO)
+#macro VS_MAX_ATAQUES		6		//BLOCOS PENDENTES NA FILA DE QUEM RECEBE (PODER NAO USA SE A FILA ESTA CHEIA)
+#macro VS_NIVEL_S			120		//SEGUNDOS DE CADA NIVEL DA PARTIDA (NIVEL 1, 2 E 3: O 3 NAO ACABA)
+#macro VS_ESCOLHA_S		5		//SEGUNDOS PRA ESCOLHER O PODER (O JOGO DE QUEM FECHOU A LINHA FICA PARADO)
+#macro VS_ESCOLHA_ATRASO	28		//FRAMES ATE O MENU APARECER DEPOIS DE FECHAR A LINHA (DEIXA A LINHA EXPLODIR)
 #macro VS_COR_P1			#4D7CFF		//AZUL (O LADO ESQUERDO)
 #macro VS_COR_P2			#FF553A		//VERMELHO (O LADO DIREITO)
 
+global.vs_nivel		= 1;		//NIVEL DA PARTIDA (VERSUS_NIVEL), PRA AVISAR QUANDO SOBE
 global.vs_perdedor	= 0;		//0 NINGUEM PERDEU, 1 OU 2 = JOGADOR QUE PERDEU A RODADA
 global.vs_vitorias	= [0, 0];	//VITORIAS DA SESSAO (NAO ZERA QUANDO REINICIA: REVANCHE)
 global.vs_contou	= false;	//A VITORIA DA RODADA JA FOI CONTADA?
@@ -288,6 +292,17 @@ function versus_criar()
 			fantasma : noone,				//O FANTASMA DO DONO DA ARENA (ESTA NA ARENA DO ADVERSARIO)
 			fant_t : 0,					//FRAMES QUE FALTAM DO FANTASMA
 			linhas : 0,						//LINHAS FECHADAS NA RODADA
+			slots : ["", "", "", ""],		//OS 4 PODERES GUARDADOS (NOME DO BLOCO OU "" = VAZIO), USADOS PELAS TECLAS 1 2 3 4 (P1) / NUM 5 6 7 8 (P2)
+			slot_t : [0, 0, 0, 0],			//QUANDO CADA UM FOI GUARDADO (O MAIS ANTIGO SAI SE ESTIVER CHEIO)
+			slot_pop : [0, 0, 0, 0],		//1 A 0: PULINHO DA CAIXA QUANDO GANHA OU USA
+			ajudas : [],					//BLOCOS QUE O PROPRIO DONO MANDOU PRA ARENA DELE (ESPECIAL, RAIO). NAO SAO CANCELADOS POR LINHAS
+			escolha : undefined,			//MENU DE ESCOLHA ABERTO: { OPCOES, SEL, T } (A ARENA FICA PARADA ENQUANTO ISSO)
+			escolha_atraso : 0,				//FRAMES ATE ABRIR O PROXIMO MENU
+			recompensas : [],				//MENUS A ABRIR: { NIVEL, COMBO }
+			chuva : 0,						//PEÇAS RAPIDAS QUE AINDA VAO CAIR NESSA ARENA (PODER CHUVA)
+			duplas : 0,						//PEÇAS QUE AINDA VEM EM PAR NESSA ARENA (PODER DUPLAS)
+			dupla_par : false,
+			lin3 : 0,						//LINHAS FECHADAS NO NIVEL 3 (GUARDA PRO MINIJOGO DA 5A LINHA)
 		});
 	}
 }
@@ -298,6 +313,7 @@ function versus_montar()
 	vs_montado = true;
 	global.vs_perdedor = 0;
 	global.vs_contou = false;
+	global.vs_nivel = 1;
 	//OBJETOS DO VERSUS ANTIGO E DO ARCADE (PAREDES, CHAO E REGUA QUE A ROOM TRAZ NO LUGAR ERRADO)
 	with(obj_block) instance_destroy();
 	with(obj_linha) instance_destroy();
@@ -363,7 +379,8 @@ function versus_spawn(_z)
 	_zn.topo_cheio = 0;
 
 	//O QUE NASCE: UM ATAQUE RECEBIDO (TEM PRIORIDADE) OU A PROXIMA PEÇA DA ZONA
-	var _ataque = array_length(_zn.ataques) > 0 ? _zn.ataques[0] : "";
+	var _fonte = array_length(_zn.ajudas) > 0 ? 2 : (array_length(_zn.ataques) > 0 ? 1 : 0);	//1 = ATAQUE DO ADVERSARIO, 2 = BLOCO QUE O DONO MANDOU PRA SI
+	var _ataque = _fonte == 2 ? _zn.ajudas[0] : (_fonte == 1 ? _zn.ataques[0] : "");
 	if(_ataque != "") debug_preparar(_ataque);
 	else
 	{
@@ -384,7 +401,8 @@ function versus_spawn(_z)
 	var _escolha = versus_colunas(_zn, global.prox_tipo)[0];
 	instance_create_layer((x + CEL / 2) + CEL * _escolha.col, (y + CEL / 2) - CEL * 2, "Linha", obj_cria_peca);
 	_zn.lado_ultimo = _escolha.lado;
-	if(_ataque != "") array_delete(_zn.ataques, 0, 1);
+	if(_fonte == 2) array_delete(_zn.ajudas, 0, 1);
+	else if(_fonte == 1) array_delete(_zn.ataques, 0, 1);
 	else _zn.prox = undefined; //A PROXIMA SO E SORTEADA NA PROXIMA TENTATIVA (O CRIADOR AINDA VAI LER AS GLOBAIS)
 	return true;
 }
@@ -396,15 +414,31 @@ function versus_atualizar()
 	if(global.vs_perdedor != 0) exit;
 	versus_perigo_atualizar();
 	versus_fantasma_atualizar();
+	versus_nivel_atualizar();
 	for(var z = 0; z < 2; z++)
 	{
 		var _zn = zonas[z];
 		if(_zn.combo_t > 0) _zn.combo_t--; else _zn.combo = 0;
 		if(_zn.aviso > 0) _zn.aviso--;
 		if(_zn.enviou > 0) _zn.enviou--;
+		for(var k = 0; k < 4; k++) _zn.slot_pop[k] = max(0, _zn.slot_pop[k] - .06);
+		versus_poderes_atualizar(z);
 		if(_zn.congelada) continue; //TEMPO PARADO (PODER DO FANTASMA): NAO NASCEM PEÇAS NESSA ARENA
+		if(!is_undefined(_zn.escolha)) continue; //ESCOLHENDO O PODER: A ARENA FICA PARADA
 		if(_zn.espera > 0) { _zn.espera--; continue; }
-		_zn.espera = versus_spawn(z) ? versus_intervalo() : 8;
+		if(versus_spawn(z))
+		{
+			//CHUVA: AS PEÇAS CAEM UMA ATRAS DA OUTRA. DUPLAS: UMA SEGUNDA PEÇA VEM LOGO DEPOIS DA PRIMEIRA
+			if(_zn.chuva > 0) { _zn.chuva--; _zn.espera = 14; }
+			else if(_zn.duplas > 0)
+			{
+				_zn.dupla_par = !_zn.dupla_par;
+				if(_zn.dupla_par) _zn.espera = 12;
+				else { _zn.duplas--; _zn.espera = versus_intervalo(); }
+			}
+			else _zn.espera = versus_intervalo();
+		}
+		else _zn.espera = 8;
 	}
 }
 
@@ -475,57 +509,26 @@ function versus_limpar_linhas(_z, _linhas)
 		_e.criar_chao_combo = false;
 	}
 
-	//SABOTAGEM: ESSAS LINHAS CANCELAM OS ATAQUES QUE EU AINDA IA RECEBER E O QUE SOBRAR VAI PRO ADVERSARIO
-	versus_atacar(_z, _n);
+	//DEFESA: ESSAS LINHAS CANCELAM OS ATAQUES QUE EU AINDA IA RECEBER. E O JOGADOR GANHA UMA ESCOLHA DE PODER
+	versus_defender(_z, _n);
+	versus_recompensa(_z, _n);
 }
 
-//QUE BLOCOS UM ATAQUE DE _N LINHAS (COM O COMBO DA ZONA) MANDA. OS NOMES SAO OS DO DEBUG_LISTA_BLOCOS
-function versus_ataque_lista(_n, _combo)
-{
-	var _l = [];
-	switch(min(_n, 4))
-	{
-		case 1: _l = ["Inimigo"]; break;
-		case 2: _l = ["Gelo"]; break;
-		case 3: _l = ["Cabecudo"]; break;
-		case 4: _l = ["Bomba", "Laser"]; break;
-	}
-	if(_combo >= 3) array_push(_l, "Raivoso");
-	return _l;
-}
-
-//_Z FECHOU _N LINHAS. PRIMEIRO ELAS CANCELAM ATAQUES PENDENTES CONTRA _Z (UMA LINHA, UM ATAQUE). O QUE SOBRAR VAI PRO OUTRO LADO
-function versus_atacar(_z, _n)
+//_Z FECHOU _N LINHAS: CADA LINHA CANCELA UM ATAQUE QUE ESTAVA CHEGANDO NA ARENA DELE (O ULTIMO DA FILA)
+function versus_defender(_z, _n)
 {
 	var _eu = zonas[_z];
-	var _el = zonas[1 - _z];
-	var _sobra = _n;
 	var _cancelou = 0;
-	while(_sobra > 0 and array_length(_eu.ataques) > 0)
+	while(_cancelou < _n and array_length(_eu.ataques) > 0)
 	{
 		array_delete(_eu.ataques, array_length(_eu.ataques) - 1, 1);
-		_sobra--;
 		_cancelou++;
 	}
-	var _cx = _eu.x + VS_COLS * CEL / 2;
 	if(_cancelou > 0)
 	{
-		efeito_texto(global.linguagem == 0 ? "DEFENDEU!" : "BLOCKED!", _cx, y + 60, #5CC8FF, 1.2);
+		efeito_texto(global.linguagem == 0 ? "DEFENDEU!" : "BLOCKED!", _eu.x + VS_COLS * CEL / 2, y + 60, #5CC8FF, 1.2);
 		som_tocar(snd_escudo, .05);
 	}
-	if(_sobra <= 0) return;
-	var _lista = versus_ataque_lista(_sobra, _eu.combo);
-	for(var i = 0; i < array_length(_lista); i++)
-	{
-		if(array_length(_el.ataques) >= VS_MAX_ATAQUES) break;
-		array_push(_el.ataques, _lista[i]);
-	}
-	_el.aviso = room_speed * 1.4;
-	_eu.enviou = room_speed * 1.1;
-	var _ex = _el.x + VS_COLS * CEL / 2;
-	efeito_texto(global.linguagem == 0 ? "ATAQUE!" : "ATTACK!", _ex, y + 40, #FF5577, 1.4);
-	som_tocar(snd_menu_erro_03);
-	shakes(6, 2);
 }
 
 //A ZONA ENCHEU (OU O PLAYER MORREU): ESSE JOGADOR PERDEU A RODADA
@@ -540,7 +543,7 @@ function versus_perder(_z)
 function versus_teleporte(_n)
 {
 	var _zn = versus_zona_do(_n);
-	if(_zn.congelada) return; //TEMPO PARADO NA ARENA: NADA TELEPORTA
+	if(_zn.congelada or !is_undefined(_zn.escolha)) return; //TEMPO PARADO NA ARENA (OU ESCOLHENDO PODER): NADA TELEPORTA
 	fila_limpar_zona(_zn);
 	if(!instance_exists(_zn.atual)) return;
 	with(_zn.atual) teleportar_peca();
@@ -783,16 +786,26 @@ function versus_cartao_desenhar(_z, _esq)
 		draw_sprite(spr_coracao, 1, _hx, _hy);
 	}
 
-	//AS 4 CAIXAS: OS ATAQUES QUE VAO NASCER NA ARENA DESSE JOGADOR (VERMELHO = VEM COISA RUIM)
+	//AS 4 CAIXAS: OS PODERES GUARDADOS. VERDE = AJUDA VOCE, VERMELHO = ATACA O ADVERSARIO. O NUMERO E A TECLA QUE USA
 	for(var i = 0; i < 4; i++)
 	{
 		var _bx = _x + 13.5 + 24 * i, _by = _y + 104.5;
-		if(i >= array_length(_zn.ataques)) continue;
-		draw_set_color(#5A1428);
-		draw_rectangle(_bx - 8, _by - 8, _bx + 8, _by + 8, false);
-		draw_set_color(#FF5577);
-		draw_rectangle(_bx - 8, _by - 8, _bx + 8, _by + 8, true);
-		bloco_icone_desenhar(string_lower(_zn.ataques[i]), _bx, _by, .7);
+		var _id = _zn.slots[i];
+		var _kn = string(_n == 1 ? i + 1 : i + 5);
+		draw_set_halign(fa_center);
+		draw_set_valign(fa_middle);
+		if(_id != "")
+		{
+			var _inf = versus_opcao_info(_id);
+			var _h = 8 + 3 * _zn.slot_pop[i];
+			draw_set_color(_inf.eu ? #123A26 : #5A1428);
+			draw_rectangle(_bx - _h, _by - _h, _bx + _h, _by + _h, false);
+			draw_set_color(_inf.eu ? TEMPO_VERDE : #FF5577);
+			draw_rectangle(_bx - _h, _by - _h, _bx + _h, _by + _h, true);
+			versus_icone_desenhar(_id, _bx, _by - 1, .7);
+		}
+		draw_text_transformed_color(_bx + 6, _by + 6, _kn, .4, .4, 0, _sombra, _sombra, _sombra, _sombra, 1);
+		draw_text_transformed_color(_bx + 5, _by + 5, _kn, .4, .4, 0, _id != "" ? c_white : #4A4570, _id != "" ? c_white : #4A4570, _id != "" ? c_white : #4A4570, _id != "" ? c_white : #4A4570, 1);
 	}
 
 	//PONTOS (O NUMERO FICA EMBAIXO DA PALAVRA "SCORE" QUE JA VEM NO DESENHO)
@@ -827,6 +840,25 @@ function versus_cartao_desenhar(_z, _esq)
 		draw_text_transformed_color(_cx, _ty, tecla_nome(_imp.down) + " + " + tecla_nome(_imp.soco), .5, .5, 0, #31FCFF, #31FCFF, #31FCFF, #31FCFF, 1);
 	}
 	draw_text_transformed_color(_cx, _ty + 22, (_pt ? "TELEPORTE: " : "DROP: ") + tecla_nome(_imp.acelerar), .5, .5, 0, _cinza, _cinza, _cinza, _cinza, 1);
+	//O QUE ESTA CHEGANDO NA ARENA DESSE JOGADOR (VERMELHO = ATAQUE, VERDE = O QUE ELE MESMO MANDOU), NA ORDEM EM QUE NASCEM
+	var _fila = [];
+	for(var i = 0; i < array_length(_zn.ajudas); i++) array_push(_fila, { id : _zn.ajudas[i], eu : true });
+	for(var i = 0; i < array_length(_zn.ataques); i++) array_push(_fila, { id : _zn.ataques[i], eu : false });
+	if(array_length(_fila) > 0)
+	{
+		var _pisca = _zn.aviso > 0 and (current_time div 120) mod 2 == 0;
+		var _cl = _pisca ? #FF5577 : _cinza;
+		draw_text_transformed_color(_cx, _ty + 38, _pt ? "CHEGANDO" : "INCOMING", .5, .5, 0, _cl, _cl, _cl, _cl, 1);
+		for(var i = 0; i < array_length(_fila); i++)
+		{
+			var _fx = _cx - (min(array_length(_fila), VS_MAX_ATAQUES) - 1) * 8.5 + i * 17, _fy = _ty + 52;
+			draw_set_color(_fila[i].eu ? #123A26 : #5A1428);
+			draw_rectangle(_fx - 7, _fy - 7, _fx + 7, _fy + 7, false);
+			draw_set_color(_fila[i].eu ? TEMPO_VERDE : #FF5577);
+			draw_rectangle(_fx - 7, _fy - 7, _fx + 7, _fy + 7, true);
+			versus_icone_desenhar(_fila[i].id, _fx, _fy, .55);
+		}
+	}
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 	draw_set_color(c_white);
@@ -859,6 +891,19 @@ function versus_centro_desenhar()
 	var _seg = floor(global.tempo_partida);
 	var _tempo = string_replace_all(string_format(_seg div 60, 2, 0), " ", "0") + ":" + string_replace_all(string_format(_seg mod 60, 2, 0), " ", "0");
 	draw_text_transformed_color(_cx, _top + 88, _tempo, 1, 1, 0, c_white, c_white, c_white, c_white, 1);
+	//NIVEL DA PARTIDA (SOBE A CADA VS_NIVEL_S SEGUNDOS ATE O 3) E UMA BARRINHA ATE O PROXIMO. O NIVEL DECIDE OS PODERES QUE APARECEM
+	var _nv = versus_nivel();
+	var _nvt = _pt ? "NIVEL " + string(_nv) : "LEVEL " + string(_nv);
+	draw_text_transformed_color(_cx + 1, _top + 105, _nvt, .6, .6, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_cx, _top + 104, _nvt, .6, .6, 0, #31FCFF, #31FCFF, #31FCFF, #31FCFF, 1);
+	if(_nv < 3)
+	{
+		var _pr = frac(global.tempo_partida / VS_NIVEL_S);
+		draw_set_color(#1E1A38);
+		draw_rectangle(_cx - 24, _top + 112, _cx + 24, _top + 115, false);
+		draw_set_color(#31FCFF);
+		draw_rectangle(_cx - 24, _top + 112, _cx - 24 + 48 * _pr, _top + 115, false);
+	}
 
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
@@ -882,6 +927,7 @@ function versus_hud_desenhar()
 	versus_cartao_desenhar(0, true);
 	versus_cartao_desenhar(1, false);
 	versus_centro_desenhar();
+	for(var z = 0; z < 2; z++) versus_escolha_desenhar(z);
 
 	//CONTAGEM NO COMEÇO DA RODADA: 3, 2, 1, VALENDO!
 	var _t = obj_area.zonas[0].espera;
@@ -1349,7 +1395,7 @@ function versus_tecla_poder(_n)
 function versus_zona_parada(_x)
 {
 	var _z = versus_zona_x(_x);
-	return _z >= 0 and obj_area.zonas[_z].congelada;
+	return _z >= 0 and (obj_area.zonas[_z].congelada or !is_undefined(obj_area.zonas[_z].escolha));	//(PARADA PELO PODER OU PELO MENU DE ESCOLHA)
 }
 
 //PAUSA SO PRA QUEM ESTA NESSE X: A PAUSA DO JOGO TODO OU A ZONA CONGELADA PELO PODER
@@ -1379,7 +1425,7 @@ function versus_poder_alternar(_n)
 	var _al = obj_area.zonas[2 - _n];	//ZONA DO ADVERSARIO
 	if(versus_fantasma_ativo(_n)) { versus_fantasma_encerrar(_n); return; }
 	//SEM ENERGIA, OU O ADVERSARIO TA COM O TEMPO PARADO (NAO TEM COMO INVADIR UMA ARENA PARADA), OU TEM UM FANTASMA DELE NA MINHA
-	if(_zn.energia < VS_FANT_CUSTO or _al.congelada or _zn.invasor > 0)
+	if(_zn.energia < VS_FANT_CUSTO or _al.congelada or _zn.invasor > 0 or !is_undefined(_zn.escolha))
 	{
 		som_tocar(snd_menu_erro_04);
 		efeito_texto(_zn.energia < VS_FANT_CUSTO ? (global.linguagem == 0 ? "SEM ENERGIA" : "NO ENERGY") : (global.linguagem == 0 ? "AGORA NAO!" : "NOT NOW!"), _zn.x + VS_COLS * CEL / 2, obj_area.y + obj_area.sprite_height - 50, c_red, 1);
@@ -1860,4 +1906,311 @@ function coop_hud_desenhar()
 	draw_set_font(-1);
 	draw_set_halign(-1);
 	draw_set_valign(-1);
+}
+
+
+//==================== VERSUS: PODERES POR ESCOLHA ====================
+//FECHAR LINHA DA UMA ESCOLHA: O JOGO DE QUEM FECHOU PARA POR ATE VS_ESCOLHA_S SEGUNDOS (O DO ADVERSARIO CONTINUA), APARECEM 3 OPÇOES NO MEIO
+//DA ARENA, E A ESCOLHIDA FICA GUARDADA NUMA DAS 4 CAIXAS. DEPOIS E SO APERTAR A TECLA DA CAIXA (P1: 1 2 3 4 / P2: NUM 5 6 7 8).
+//O QUE APARECE DEPENDE DO NIVEL DA PARTIDA (SOBE A CADA VS_NIVEL_S SEGUNDOS) E DO COMBO:
+//	NIVEL 1: ESPECIAL (PRA VOCE), INIMIGO PATRULHEIRO, RAIVOSO		NIVEL 2: ELETRICO (PRA VOCE), PEDRA, BURACO NEGRO, LASER
+//	NIVEL 3: BOMBA, CABEÇADA, SNIPER, ABELHAS, FANTASMA				COMBO DE 3 LINHAS: GELATINA, GELO, CHUVA DE PEÇAS, PEÇAS DUPLAS
+//OS PODERES "PRA VOCE" NASCEM NA PROPRIA ARENA; OS OUTROS, NA DO ADVERSARIO. LINHAS FECHADAS AINDA CANCELAM ATAQUES QUE ESTAVAM CHEGANDO.
+//(AINDA NAO TEM: O MINIJOGO QUE O NIVEL 3 DA NA 5A LINHA. A CONTA JA ESTA EM LIN3)
+
+//NIVEL ATUAL DA PARTIDA (1, 2 OU 3)
+function versus_nivel()
+{
+	return clamp(1 + floor(global.tempo_partida / VS_NIVEL_S), 1, 3);
+}
+
+//SUBIU DE NIVEL: AVISO NO CENTRO DA TELA
+function versus_nivel_atualizar()
+{
+	var _nv = versus_nivel();
+	if(_nv == global.vs_nivel) return;
+	global.vs_nivel = _nv;
+	efeito_texto((global.linguagem == 0 ? "NIVEL " : "LEVEL ") + string(_nv) + "!", room_width / 2, y + 150, #31FCFF, 1.8);
+	onda_choque(room_width / 2, y + 150, 120, 6, 30);
+	som_tocar(snd_jingle_poder);
+	shakes(6, 2);
+}
+
+//TECLA DA CAIXA _I (0 A 3) DO JOGADOR _N
+function versus_tecla_slot(_n, _i)
+{
+	return _n == 1 ? ord("1") + _i : vk_numpad5 + _i;
+}
+
+//OPÇOES QUE O NIVEL (OU O COMBO) OFERECE
+function versus_pool(_nivel, _combo)
+{
+	if(_combo) return ["Gelatina", "Gelo", "Chuva", "Duplas"];
+	switch(_nivel)
+	{
+		case 1: return ["Especial", "Inimigo", "Raivoso"];
+		case 2: return ["Raio", "Pedra", "Buraco", "LaserLado"];
+	}
+	return ["Bomba", "Cabecudo", "Sniper", "Colmeia", "Fantasma"];
+}
+
+//DADOS DE UMA OPÇAO: { NOME, DESC (2 LINHAS), EU (AJUDA QUEM USA), ICONE }. OS NOMES SAO OS DO DEBUG_LISTA_BLOCOS (+ "Chuva" E "Duplas")
+function versus_opcao_info(_id)
+{
+	var _l = global.linguagem == 0 ? 0 : 1;
+	var _n = [_id, _id], _d = ["", ""], _eu = false;
+	switch(_id)
+	{
+		case "Especial":	_n = ["ESPECIAL", "SPECIAL"];			_d = ["BLOCO COM PREMIO SURPRESA\nNA SUA ARENA", "BLOCK WITH A SURPRISE PRIZE\nIN YOUR ARENA"]; _eu = true; break;
+		case "Inimigo":		_n = ["PATRULHEIRO", "PATROL"];			_d = ["INIMIGO QUE PATRULHA A\nARENA DO ADVERSARIO", "ENEMY THAT PATROLS THE\nOPPONENT'S ARENA"]; break;
+		case "Raivoso":		_n = ["RAIVOSO", "ANGRY"];				_d = ["PEÇA QUE CAI DIRETO NA\nARENA DO ADVERSARIO", "PIECE THAT DROPS STRAIGHT\nIN THE OPPONENT'S ARENA"]; break;
+		case "Raio":		_n = ["ELETRICO", "ELECTRIC"];			_d = ["RAIO NA SUA ARENA:\nPONTOS EM DOBRO", "LIGHTNING IN YOUR ARENA:\nDOUBLE POINTS"]; _eu = true; break;
+		case "Pedra":		_n = ["PEDRA", "STONE"];				_d = ["BLOCO DURO: PRECISA DE\n2 GOLPES PRA QUEBRAR", "TOUGH BLOCK: TAKES\n2 HITS TO BREAK"]; break;
+		case "Buraco":		_n = ["BURACO NEGRO", "BLACK HOLE"];	_d = ["ENGOLE UM BLOCO E O SOLTA\nPEGANDO FOGO NO ADVERSARIO", "SWALLOWS A BLOCK AND DROPS\nIT BURNING ON THE OPPONENT"]; break;
+		case "LaserLado":	_n = ["LASER", "LASER"];				_d = ["BLOCO QUE ATIRA LASER PRO\nLADO NA ARENA DO ADVERSARIO", "BLOCK THAT SHOOTS A LASER\nSIDEWAYS AT THE OPPONENT"]; break;
+		case "Bomba":		_n = ["BOMBA", "BOMB"];					_d = ["INIMIGO QUE EXPLODE NA\nARENA DO ADVERSARIO", "ENEMY THAT EXPLODES IN\nTHE OPPONENT'S ARENA"]; break;
+		case "Cabecudo":	_n = ["CABEÇADA", "HEADBUTT"];			_d = ["INIMIGO QUE EMPURRA E\nQUEBRA BLOCOS", "ENEMY THAT PUSHES AND\nBREAKS BLOCKS"]; break;
+		case "Sniper":		_n = ["SNIPER", "SNIPER"];				_d = ["BLOCO QUE SE LANÇA QUANDO\nO PLAYER PASSA NA LINHA", "BLOCK THAT LAUNCHES WHEN\nTHE PLAYER CROSSES ITS LINE"]; break;
+		case "Colmeia":		_n = ["ABELHAS", "BEES"];				_d = ["COLMEIA QUE SOLTA ABELHAS\nQUE DESTROEM BLOCOS", "HIVE THAT RELEASES BEES\nTHAT DESTROY BLOCKS"]; break;
+		case "Fantasma":	_n = ["FANTASMA", "GHOST"];				_d = ["PEÇA TRANSPARENTE QUE O\nPLAYER ATRAVESSA", "TRANSPARENT PIECE THE\nPLAYER WALKS THROUGH"]; break;
+		case "Gelatina":	_n = ["GELATINA", "JELLY"];				_d = ["TRAMPOLIM NA ARENA\nDO ADVERSARIO", "TRAMPOLINE IN THE\nOPPONENT'S ARENA"]; break;
+		case "Gelo":		_n = ["GELO", "ICE"];					_d = ["PEÇA DE GELO QUE\nESCORREGA", "ICE PIECE THAT\nSLIPS"]; break;
+		case "Chuva":		_n = ["CHUVA DE PEÇAS", "PIECE RAIN"];	_d = ["SOLTA 7 PEÇAS RAPIDAS NA\nARENA DO ADVERSARIO", "DROPS 7 FAST PIECES IN THE\nOPPONENT'S ARENA"]; break;
+		case "Duplas":		_n = ["PEÇAS DUPLAS", "DOUBLE PIECES"];	_d = ["AS PROXIMAS PEÇAS DO\nADVERSARIO VEM EM PAR", "THE OPPONENT'S NEXT\nPIECES COME IN PAIRS"]; break;
+	}
+	return { id : _id, nome : _n[_l], desc : _d[_l], eu : _eu, icone : _id == "LaserLado" ? "laser_lado" : string_lower(_id) };
+}
+
+//ICONE DE UMA OPÇAO CENTRADO EM (_X, _Y). CHUVA E DUPLAS NAO SAO UM BLOCO SO: DESENHA PEÇAS
+function versus_icone_desenhar(_id, _x, _y, _esc)
+{
+	if(_id == "Chuva")
+	{
+		bloco_icone_desenhar("normal", _x - 6 * _esc, _y - 6 * _esc, .55 * _esc);
+		bloco_icone_desenhar("normal", _x + 5 * _esc, _y - 1 * _esc, .55 * _esc);
+		bloco_icone_desenhar("normal", _x - 3 * _esc, _y + 6 * _esc, .55 * _esc);
+		return;
+	}
+	if(_id == "Duplas")
+	{
+		bloco_icone_desenhar("normal", _x - 5 * _esc, _y, .7 * _esc);
+		bloco_icone_desenhar("normal", _x + 5 * _esc, _y, .7 * _esc);
+		return;
+	}
+	bloco_icone_desenhar(versus_opcao_info(_id).icone, _x, _y, _esc);
+}
+
+//_Z FECHOU _N LINHAS: GANHA UM MENU DE ESCOLHA (DE COMBO SE JA ESTA NO COMBO DE 3)
+function versus_recompensa(_z, _n)
+{
+	var _zn = zonas[_z];
+	var _combo = _zn.combo >= 3;
+	if(_combo) _zn.combo = 0;
+	if(versus_nivel() >= 3) _zn.lin3 += _n;
+	if(array_length(_zn.recompensas) >= 3) return; //(MUITA COISA NA FILA: IGNORA)
+	array_push(_zn.recompensas, { nivel : versus_nivel(), combo : _combo });
+	if(is_undefined(_zn.escolha) and _zn.escolha_atraso <= 0) _zn.escolha_atraso = VS_ESCOLHA_ATRASO;
+}
+
+//TODO FRAME DE UMA ZONA: ABRE O MENU QUANDO CHEGA A HORA, LE AS TECLAS DELE E AS DAS 4 CAIXAS
+function versus_poderes_atualizar(_z)
+{
+	var _zn = zonas[_z];
+	var _n = _z + 1;
+	var _imp = imputs_jogador(_n);
+	if(global.vs_perdedor != 0) return;
+	var _e = _zn.escolha;
+
+	if(is_undefined(_e))
+	{
+		//ABRE O PROXIMO MENU (SE O DONO ESTA COM O PODER DO FANTASMA, ESPERA ELE VOLTAR)
+		if(array_length(_zn.recompensas) > 0 and !_zn.congelada)
+		{
+			if(_zn.escolha_atraso > 0) _zn.escolha_atraso--;
+			else versus_escolha_abrir(_z);
+		}
+		//USAR UM PODER GUARDADO
+		for(var i = 0; i < 4; i++) if(keyboard_check_pressed(versus_tecla_slot(_n, i))) versus_poder_usar(_n, i);
+		return;
+	}
+
+	//MENU ABERTO: ESQUERDA/DIREITA ESCOLHE, SOCO CONFIRMA (OU A TECLA DA CAIXA 1/2/3 ESCOLHE DIRETO)
+	var _qtd = array_length(_e.opcoes);
+	if(keyboard_check_pressed(_imp.left)) { _e.sel = (_e.sel + _qtd - 1) mod _qtd; som_tocar(snd_menu_select_02, .05); }
+	if(keyboard_check_pressed(_imp.rigth)) { _e.sel = (_e.sel + 1) mod _qtd; som_tocar(snd_menu_select_02, .05); }
+	var _ok = keyboard_check_pressed(_imp.soco) or keyboard_check_pressed(_imp.soco_press);
+	for(var i = 0; i < _qtd; i++) if(keyboard_check_pressed(versus_tecla_slot(_n, i))) { _e.sel = i; _ok = true; }
+	_e.t--;
+	if(_e.t <= 0) _ok = true; //ACABOU O TEMPO: FICA COM A OPÇAO QUE ESTA MARCADA
+	if(_ok) versus_escolha_fechar(_z);
+}
+
+//ABRE O MENU: SORTEIA 3 OPÇOES DO NIVEL E PARA O JOGO DESSA ARENA
+function versus_escolha_abrir(_z)
+{
+	var _zn = zonas[_z];
+	var _r = _zn.recompensas[0];
+	var _pool = versus_pool(_r.nivel, _r.combo);
+	var _op = [];
+	while(array_length(_op) < min(3, array_length(_pool)))
+	{
+		var _c = _pool[irandom(array_length(_pool) - 1)];
+		if(!array_contains(_op, _c)) array_push(_op, _c);
+	}
+	_zn.escolha = { opcoes : _op, sel : 0, t : room_speed * VS_ESCOLHA_S, tot : room_speed * VS_ESCOLHA_S, combo : _r.combo, nivel : _r.nivel };
+	var _p = player_n(_z + 1);
+	if(_p != noone) { _p.vs_parado = true; _p.velh = 0; }
+	som_tocar(snd_jingle_poder, .05);
+	efeito_texto(_r.combo ? "COMBO!" : (global.linguagem == 0 ? "ESCOLHA!" : "PICK ONE!"), _zn.x + VS_COLS * CEL / 2, y + 40, _r.combo ? c_aqua : c_yellow, 1.3);
+}
+
+//CONFIRMOU: GUARDA O PODER NUMA CAIXA (SE TODAS ESTAO CHEIAS, SUBSTITUI O MAIS ANTIGO) E O JOGO VOLTA
+function versus_escolha_fechar(_z)
+{
+	var _zn = zonas[_z];
+	var _e = _zn.escolha;
+	var _id = _e.opcoes[_e.sel];
+	var _s = -1;
+	for(var i = 0; i < 4; i++) if(_zn.slots[i] == "") { _s = i; break; }
+	if(_s < 0)
+	{
+		_s = 0;
+		for(var i = 1; i < 4; i++) if(_zn.slot_t[i] < _zn.slot_t[_s]) _s = i;
+	}
+	_zn.slots[_s] = _id;
+	_zn.slot_t[_s] = current_time;
+	_zn.slot_pop[_s] = 1;
+	_zn.escolha = undefined;
+	array_delete(_zn.recompensas, 0, 1);
+	var _p = player_n(_z + 1);
+	if(_p != noone and !instance_exists(_zn.fantasma)) _p.vs_parado = false;
+	if(array_length(_zn.recompensas) > 0) _zn.escolha_atraso = 18;
+	som_tocar(snd_certo, .05);
+	efeito_texto(versus_opcao_info(_id).nome, _zn.x + VS_COLS * CEL / 2, y + 40, versus_opcao_info(_id).eu ? TEMPO_VERDE : #FF5577, 1.1);
+}
+
+//APERTOU A TECLA DA CAIXA _I DO JOGADOR _N: MANDA O BLOCO (PRA ARENA DO ADVERSARIO OU PRA PROPRIA, SE FOR PODER "PRA VOCE")
+function versus_poder_usar(_n, _i)
+{
+	if(global.vs_perdedor != 0 or global.game_pause) return;
+	var _zn = versus_zona_do(_n);
+	var _id = _zn.slots[_i];
+	if(_id == "" or !is_undefined(_zn.escolha)) return;
+	var _inf = versus_opcao_info(_id);
+	var _al = obj_area.zonas[2 - _n];
+	var _alvo = _inf.eu ? _zn : _al;
+	var _especial = _id == "Chuva" or _id == "Duplas";
+	var _fila = _inf.eu ? _alvo.ajudas : _alvo.ataques;
+	if(!_especial and array_length(_fila) >= VS_MAX_ATAQUES)
+	{
+		som_tocar(snd_menu_erro_04);
+		efeito_texto(global.linguagem == 0 ? "FILA CHEIA" : "QUEUE FULL", _zn.x + VS_COLS * CEL / 2, y + 60, #FF5577, 1);
+		return;
+	}
+	switch(_id)
+	{
+		case "Chuva":	_alvo.chuva += 7; break;
+		case "Duplas":	_alvo.duplas += 6; _alvo.dupla_par = false; break;
+		default:		array_push(_fila, _id); break;
+	}
+	_zn.slots[_i] = "";
+	_zn.slot_pop[_i] = 1;
+	_zn.enviou = room_speed * 1.1;
+	var _ex = _alvo.x + VS_COLS * CEL / 2;
+	if(_inf.eu)
+	{
+		efeito_texto(global.linguagem == 0 ? "PODER!" : "POWER!", _ex, y + 40, TEMPO_VERDE, 1.4);
+		som_tocar(snd_certo);
+	}
+	else
+	{
+		_al.aviso = room_speed * 1.4;
+		efeito_texto(global.linguagem == 0 ? "ATAQUE!" : "ATTACK!", _ex, y + 40, #FF5577, 1.4);
+		som_tocar(snd_menu_erro_03);
+		shakes(6, 2);
+	}
+}
+
+//O MENU DE ESCOLHA NO MEIO DA ARENA (_Z) E, EMBAIXO DELA, O TEMPO QUE FALTA. SO APARECE QUANDO O MENU ESTA ABERTO
+function versus_escolha_desenhar(_z)
+{
+	var _zn = obj_area.zonas[_z];
+	var _e = _zn.escolha;
+	if(is_undefined(_e)) return;
+	var _n = _z + 1;
+	var _pt = global.linguagem == 0;
+	var _cor = _z == 0 ? VS_COR_P1 : VS_COR_P2;
+	var _sombra = #0E071B;
+	var _cinza = #92A1B9;
+	var _cx = _zn.x + VS_COLS * CEL / 2;
+	var _y1 = obj_area.y + 52;
+	var _pul = .5 + .5 * sin(current_time / 120);
+
+	//PAINEL
+	draw_set_color(_sombra);
+	draw_set_alpha(.93);
+	draw_rectangle(_zn.x + 1, _y1, _zn.x + VS_COLS * CEL - 1, _y1 + 184, false);
+	draw_set_alpha(1);
+	draw_set_color(_cor);
+	draw_rectangle(_zn.x + 1, _y1, _zn.x + VS_COLS * CEL - 1, _y1 + 184, true);
+	draw_set_font(fnt_hud);
+	draw_set_halign(fa_center);
+	draw_set_valign(fa_middle);
+	var _tit = _e.combo ? (_pt ? "COMBO! ESCOLHA UM PODER" : "COMBO! PICK A POWER") : (_pt ? "ESCOLHA UM PODER" : "PICK A POWER");
+	draw_text_transformed_color(_cx + 1, _y1 + 11, _tit, .6, .6, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_cx, _y1 + 10, _tit, .6, .6, 0, _e.combo ? #31FCFF : c_white, _e.combo ? #31FCFF : c_white, _e.combo ? #31FCFF : c_white, _e.combo ? #31FCFF : c_white, 1);
+
+	//AS CARTAS
+	var _qtd = array_length(_e.opcoes);
+	var _cw = 46, _ch = 84, _gap = 5;
+	var _x0 = _cx - (_qtd * _cw + (_qtd - 1) * _gap) / 2;
+	for(var i = 0; i < _qtd; i++)
+	{
+		var _inf = versus_opcao_info(_e.opcoes[i]);
+		var _sel = i == _e.sel;
+		var _kx = _x0 + i * (_cw + _gap), _ky = _y1 + 22 + (_sel ? -2 : 0);
+		draw_set_color(_sel ? #2A2350 : #1A1632);
+		draw_rectangle(_kx, _ky, _kx + _cw, _ky + _ch, false);
+		draw_set_color(_sel ? merge_color(_cor, c_white, _pul * .5) : #3A3558);
+		draw_rectangle(_kx, _ky, _kx + _cw, _ky + _ch, true);
+		if(_sel) draw_rectangle(_kx + 1, _ky + 1, _kx + _cw - 1, _ky + _ch - 1, true);
+		versus_icone_desenhar(_e.opcoes[i], _kx + _cw / 2, _ky + 24, _sel ? 1.9 : 1.6);
+		//NOME (ATE 2 LINHAS)
+		var _pal = string_split(_inf.nome, " ");
+		var _l1 = _pal[0], _l2 = "";
+		if(array_length(_pal) > 1) { _l1 = _pal[0]; _l2 = _pal[1]; }
+		var _ne = min(.5, (_cw - 4) / max(1, max(string_width(_l1), string_width(_l2))));
+		draw_text_transformed_color(_kx + _cw / 2, _ky + 50, _l1, _ne, _ne, 0, c_white, c_white, c_white, c_white, 1);
+		if(_l2 != "") draw_text_transformed_color(_kx + _cw / 2, _ky + 59, _l2, _ne, _ne, 0, c_white, c_white, c_white, c_white, 1);
+		//PRA QUEM E
+		var _ct = _inf.eu ? TEMPO_VERDE : #FF5577;
+		draw_text_transformed_color(_kx + _cw / 2, _ky + _ch - 8, _inf.eu ? (_pt ? "PRA VOCE" : "FOR YOU") : (_pt ? "ATACA" : "ATTACK"), .42, .42, 0, _ct, _ct, _ct, _ct, 1);
+		//NUMERO DA TECLA DIRETA
+		draw_text_transformed_color(_kx + 6, _ky + 7, string(_n == 1 ? i + 1 : i + 5), .45, .45, 0, _cinza, _cinza, _cinza, _cinza, 1);
+	}
+
+	//O QUE A OPÇAO MARCADA FAZ
+	var _di = versus_opcao_info(_e.opcoes[_e.sel]).desc;
+	var _linhas = string_split(_di, "\n");
+	for(var i = 0; i < array_length(_linhas); i++) draw_text_transformed_color(_cx, _y1 + 22 + _ch + 14 + i * 10, _linhas[i], .45, .45, 0, c_white, c_white, c_white, c_white, 1);
+
+	//TECLAS
+	var _imp = imputs_jogador(_n);
+	draw_text_transformed_color(_cx, _y1 + 175, tecla_nome(_imp.left) + " " + tecla_nome(_imp.rigth) + (_pt ? "  ESCOLHE    " : "  PICK    ") + tecla_nome(_imp.soco) + (_pt ? "  CONFIRMA" : "  CONFIRM"), .4, .4, 0, _cinza, _cinza, _cinza, _cinza, 1);
+
+	//TEMPO QUE FALTA, EMBAIXO DA ARENA
+	var _fr = clamp(_e.t / _e.tot, 0, 1);
+	var _by = obj_area.y + 322;
+	var _ap = _fr < .35 and (current_time div 150) mod 2 == 0;
+	draw_set_color(#1E1A38);
+	draw_rectangle(_cx - 60, _by, _cx + 60, _by + 8, false);
+	draw_rectangle_color(_cx - 60, _by, _cx - 60 + 120 * _fr, _by + 8, _ap ? #FF5577 : _cor, _ap ? #FF5577 : _cor, _ap ? #FF5577 : merge_color(_cor, c_white, .4), _ap ? #FF5577 : merge_color(_cor, c_white, .4), false);
+	draw_set_color(#5A3A8A);
+	draw_rectangle(_cx - 60, _by, _cx + 60, _by + 8, true);
+	var _seg = string(ceil(_e.t / room_speed));
+	draw_text_transformed_color(_cx + 1, _by + 17, _seg, 1.2, 1.2, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_cx, _by + 16, _seg, 1.2, 1.2, 0, c_white, c_white, c_white, c_white, 1);
+	draw_set_halign(fa_left);
+	draw_set_valign(fa_top);
+	draw_set_color(c_white);
 }
