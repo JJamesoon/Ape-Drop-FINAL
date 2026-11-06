@@ -142,9 +142,9 @@ switch(etapa)
 		if(_t == 14) pontos_somar(40, obj_area.x + 150, obj_area.y + 60, c_yellow, 1, 0);
 		if(_t == 20) log("apos ganhos: P1=" + string(global.coop_pts[0]) + " P2=" + string(global.coop_pts[1]) + " total=" + string(global.pontos_1) + " (esperado 120 / 270 / 390)");
 		if(_t == 240) screen_save("teste_c1_pontos.png");
-		if(_t == 241) { player_n(2).dano_cobrar(); log("P2 levou dano: P1=" + string(global.coop_pts[0]) + " P2=" + string(global.coop_pts[1]) + " total=" + string(global.pontos_1) + " (esperado 120 / 0 / 120)"); }
+		if(_t == 241) { player_n(2).dano_cobrar(); log("P2 levou dano: P1=" + string(global.coop_pts[0]) + " P2=" + string(global.coop_pts[1]) + " total=" + string(global.pontos_1) + " (esperado 120 / 170 / 290)"); }
 		if(_t == 243) { var _v = player_n(2).vida_atual; player_n(2).dano_cobrar(); log("P2 sem pontos levou dano de novo: vida antes=" + string(_v) + " depois=" + string(player_n(2).vida_atual) + " P1=" + string(global.coop_pts[0]) + " (IMORTAL protege coracao; P1 tem que seguir 120)"); }
-		if(_t == 244) { player_n(1).dano_cobrar(); log("P1 levou dano: P1=" + string(global.coop_pts[0]) + " total=" + string(global.pontos_1) + " (esperado 0 / 0)"); }
+		if(_t == 244) { player_n(1).dano_cobrar(); log("P1 levou dano: P1=" + string(global.coop_pts[0]) + " total=" + string(global.pontos_1) + " (esperado P1 20, total 90: o P2 tambem levou o segundo dano)"); }
 		if(_t == 300) { log("FIM"); game_end(); }
 		break;
 	#endregion

@@ -1706,8 +1706,8 @@ function coop_caixa_desenhar(_n, _x, _y, _cara, _dados)
 	}
 }
 
-//FAIXA DE BAIXO DA MOLDURA (SPR_COOP_CAIXA_BOTTOM, 247X35): LEVEL, TOTAL (NO MEIO, MAIS ALTO) E TIME. OS NUMEROS FICAM EMBAIXO DOS NOMES.
-//O MEIO MOSTRA O TOTAL DO TIME (P1 + P2). A PALAVRA "TOTAL" E DESENHADA AQUI (NA SPRITE A PALAVRA ANTIGA FOI APAGADA)
+//FAIXA DE BAIXO DA MOLDURA (SPR_COOP_CAIXA_BOTTOM, 247X35): LEVEL, TEAM SCORE (NO MEIO, MAIS ALTO) E TIME. OS NUMEROS FICAM EMBAIXO DOS NOMES.
+//O MEIO MOSTRA O TOTAL DO TIME (P1 + P2). A PALAVRA "TEAM SCORE" E DESENHADA AQUI (NA SPRITE A PALAVRA ANTIGA FOI APAGADA)
 function coop_faixa_desenhar(_x, _y, _dados)
 {
 	var _sombra = #0E071B;
@@ -1718,13 +1718,14 @@ function coop_faixa_desenhar(_x, _y, _dados)
 		draw_sprite_ext(spr_coop_caixa_bottom, 0, _x, _y, 1, 1, 0, c_white, febre_mix);
 		gpu_set_fog(false, c_white, 0, 1);
 	}
-	//"TOTAL" NO MEIO, NO MESMO ESTILO DAS OUTRAS PALAVRAS (BRANCO COM SOMBRA ESCURA)
+	//"TEAM SCORE" NO MEIO, NO MESMO ESTILO DAS OUTRAS PALAVRAS (BRANCO COM SOMBRA ESCURA)
 	draw_set_font(fnt_hud);
 	draw_set_halign(fa_center);
 	draw_set_valign(fa_middle);
 	var _azul = #003E66;
-	draw_text_transformed_color(_x + 124, _y + 11.5, "TOTAL", .75, .75, 0, _azul, _azul, _azul, _azul, 1);
-	draw_text_transformed_color(_x + 123, _y + 10.5, "TOTAL", .75, .75, 0, c_white, c_white, c_white, c_white, 1);
+	var _rot = "TEAM SCORE", _re = min(.75, 54 / max(1, string_width(_rot)));	//ENCOLHE PRA CABER NO PAINEL AZUL
+	draw_text_transformed_color(_x + 124, _y + 11.5, _rot, _re, _re, 0, _azul, _azul, _azul, _azul, 1);
+	draw_text_transformed_color(_x + 123, _y + 10.5, _rot, _re, _re, 0, c_white, c_white, c_white, c_white, 1);
 	draw_set_font(fnt_mini_hud);
 	var _vals = [[_x + 49, _y + 22, string(global.level)], [_x + 123, _y + 19, _dados.pontos], [_x + 197, _y + 22, _dados.tempo]];
 	for(var i = 0; i < 3; i++)
