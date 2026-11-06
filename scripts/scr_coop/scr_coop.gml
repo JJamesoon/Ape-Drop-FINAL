@@ -210,6 +210,8 @@ function borda_desenhar(_spr, _frame, _x, _y, _extra, _alpha = 1)
 #macro VS_COR_P1			#4D7CFF		//AZUL (O LADO ESQUERDO)
 #macro VS_COR_P2			#FF553A		//VERMELHO (O LADO DIREITO)
 
+global.vs_linha_y		= 0;		//ALTURA DA LINHA DOS ANDARES NO VERSUS (SOBE SUAVE QUANDO O NIVEL SOBE)
+global.vs_linha_int		= 0;		//VIBRAÇAO DA LINHA (SOBE NA HORA QUE O NIVEL SOBE E VAI ACALMANDO)
 global.vs_nivel		= 1;		//NIVEL DA PARTIDA (VERSUS_NIVEL), PRA AVISAR QUANDO SOBE
 global.vs_perdedor	= 0;		//0 NINGUEM PERDEU, 1 OU 2 = JOGADOR QUE PERDEU A RODADA
 global.vs_vitorias	= [0, 0];	//VITORIAS DA SESSAO (NAO ZERA QUANDO REINICIA: REVANCHE)
@@ -314,6 +316,8 @@ function versus_montar()
 	global.vs_perdedor = 0;
 	global.vs_contou = false;
 	global.vs_nivel = 1;
+	global.vs_linha_y = y + sprite_height - CEL * 2;
+	global.vs_linha_int = 0;
 	//OBJETOS DO VERSUS ANTIGO E DO ARCADE (PAREDES, CHAO E REGUA QUE A ROOM TRAZ NO LUGAR ERRADO)
 	with(obj_block) instance_destroy();
 	with(obj_linha) instance_destroy();
@@ -927,7 +931,6 @@ function versus_hud_desenhar()
 	versus_cartao_desenhar(0, true);
 	versus_cartao_desenhar(1, false);
 	versus_centro_desenhar();
-	for(var z = 0; z < 2; z++) versus_escolha_desenhar(z);
 
 	//CONTAGEM NO COMEÇO DA RODADA: 3, 2, 1, VALENDO!
 	var _t = obj_area.zonas[0].espera;
@@ -1930,6 +1933,7 @@ function versus_nivel_atualizar()
 	var _nv = versus_nivel();
 	if(_nv == global.vs_nivel) return;
 	global.vs_nivel = _nv;
+	global.vs_linha_int = 12;	//A LINHA VIBRA AO SUBIR DE NIVEL
 	efeito_texto((global.linguagem == 0 ? "NIVEL " : "LEVEL ") + string(_nv) + "!", room_width / 2, y + 150, #31FCFF, 1.8);
 	onda_choque(room_width / 2, y + 150, 120, 6, 30);
 	som_tocar(snd_jingle_poder);
@@ -1982,22 +1986,22 @@ function versus_opcao_info(_id)
 }
 
 //ICONE DE UMA OPÇAO CENTRADO EM (_X, _Y). CHUVA E DUPLAS NAO SAO UM BLOCO SO: DESENHA PEÇAS
-function versus_icone_desenhar(_id, _x, _y, _esc)
+function versus_icone_desenhar(_id, _x, _y, _esc, _a = 1)
 {
 	if(_id == "Chuva")
 	{
-		bloco_icone_desenhar("normal", _x - 6 * _esc, _y - 6 * _esc, .55 * _esc);
-		bloco_icone_desenhar("normal", _x + 5 * _esc, _y - 1 * _esc, .55 * _esc);
-		bloco_icone_desenhar("normal", _x - 3 * _esc, _y + 6 * _esc, .55 * _esc);
+		bloco_icone_desenhar("normal", _x - 6 * _esc, _y - 6 * _esc, .55 * _esc, false, _a);
+		bloco_icone_desenhar("normal", _x + 5 * _esc, _y - 1 * _esc, .55 * _esc, false, _a);
+		bloco_icone_desenhar("normal", _x - 3 * _esc, _y + 6 * _esc, .55 * _esc, false, _a);
 		return;
 	}
 	if(_id == "Duplas")
 	{
-		bloco_icone_desenhar("normal", _x - 5 * _esc, _y, .7 * _esc);
-		bloco_icone_desenhar("normal", _x + 5 * _esc, _y, .7 * _esc);
+		bloco_icone_desenhar("normal", _x - 5 * _esc, _y, .7 * _esc, false, _a);
+		bloco_icone_desenhar("normal", _x + 5 * _esc, _y, .7 * _esc, false, _a);
 		return;
 	}
-	bloco_icone_desenhar(versus_opcao_info(_id).icone, _x, _y, _esc);
+	bloco_icone_desenhar(versus_opcao_info(_id).icone, _x, _y, _esc, false, _a);
 }
 
 //_Z FECHOU _N LINHAS: GANHA UM MENU DE ESCOLHA (DE COMBO SE JA ESTA NO COMBO DE 3)
@@ -2131,7 +2135,8 @@ function versus_poder_usar(_n, _i)
 	}
 }
 
-//O MENU DE ESCOLHA NO MEIO DA ARENA (_Z) E, EMBAIXO DELA, O TEMPO QUE FALTA. SO APARECE QUANDO O MENU ESTA ABERTO
+//O MENU DE ESCOLHA NO MEIO DA ARENA (_Z), MINIMALISTA: SO OS ICONES DAS OPÇOES, O NOME DA MARCADA E PRA QUEM ELA E. EMBAIXO DA ARENA, O TEMPO
+//QUE FALTA. DESENHADO NA GUI (VERSUS_PODERES_GUI_DESENHAR), ENTAO FICA NA FRENTE DAS PEÇAS
 function versus_escolha_desenhar(_z)
 {
 	var _zn = obj_area.zonas[_z];
@@ -2143,74 +2148,118 @@ function versus_escolha_desenhar(_z)
 	var _sombra = #0E071B;
 	var _cinza = #92A1B9;
 	var _cx = _zn.x + VS_COLS * CEL / 2;
-	var _y1 = obj_area.y + 52;
+	var _cy = obj_area.y + 120;
 	var _pul = .5 + .5 * sin(current_time / 120);
+	var _qtd = array_length(_e.opcoes);
 
-	//PAINEL
+	//FAIXA ESCURA SUAVE COM UM FIO NA COR DO JOGADOR EM CIMA E EMBAIXO
 	draw_set_color(_sombra);
-	draw_set_alpha(.93);
-	draw_rectangle(_zn.x + 1, _y1, _zn.x + VS_COLS * CEL - 1, _y1 + 184, false);
-	draw_set_alpha(1);
+	draw_set_alpha(.78);
+	draw_rectangle(_zn.x + 2, _cy - 36, _zn.x + VS_COLS * CEL - 2, _cy + 52, false);
+	draw_set_alpha(.9);
 	draw_set_color(_cor);
-	draw_rectangle(_zn.x + 1, _y1, _zn.x + VS_COLS * CEL - 1, _y1 + 184, true);
+	draw_line(_zn.x + 2, _cy - 36, _zn.x + VS_COLS * CEL - 2, _cy - 36);
+	draw_line(_zn.x + 2, _cy + 52, _zn.x + VS_COLS * CEL - 2, _cy + 52);
+	draw_set_alpha(1);
+
+	//OS ICONES (O MARCADO FICA MAIOR, COM UM QUADRO; OS OUTROS FICAM APAGADOS)
 	draw_set_font(fnt_hud);
 	draw_set_halign(fa_center);
 	draw_set_valign(fa_middle);
-	var _tit = _e.combo ? (_pt ? "COMBO! ESCOLHA UM PODER" : "COMBO! PICK A POWER") : (_pt ? "ESCOLHA UM PODER" : "PICK A POWER");
-	draw_text_transformed_color(_cx + 1, _y1 + 11, _tit, .6, .6, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_cx, _y1 + 10, _tit, .6, .6, 0, _e.combo ? #31FCFF : c_white, _e.combo ? #31FCFF : c_white, _e.combo ? #31FCFF : c_white, _e.combo ? #31FCFF : c_white, 1);
-
-	//AS CARTAS
-	var _qtd = array_length(_e.opcoes);
-	var _cw = 46, _ch = 84, _gap = 5;
-	var _x0 = _cx - (_qtd * _cw + (_qtd - 1) * _gap) / 2;
 	for(var i = 0; i < _qtd; i++)
 	{
-		var _inf = versus_opcao_info(_e.opcoes[i]);
 		var _sel = i == _e.sel;
-		var _kx = _x0 + i * (_cw + _gap), _ky = _y1 + 22 + (_sel ? -2 : 0);
-		draw_set_color(_sel ? #2A2350 : #1A1632);
-		draw_rectangle(_kx, _ky, _kx + _cw, _ky + _ch, false);
-		draw_set_color(_sel ? merge_color(_cor, c_white, _pul * .5) : #3A3558);
-		draw_rectangle(_kx, _ky, _kx + _cw, _ky + _ch, true);
-		if(_sel) draw_rectangle(_kx + 1, _ky + 1, _kx + _cw - 1, _ky + _ch - 1, true);
-		versus_icone_desenhar(_e.opcoes[i], _kx + _cw / 2, _ky + 24, _sel ? 1.9 : 1.6);
-		//NOME (ATE 2 LINHAS)
-		var _pal = string_split(_inf.nome, " ");
-		var _l1 = _pal[0], _l2 = "";
-		if(array_length(_pal) > 1) { _l1 = _pal[0]; _l2 = _pal[1]; }
-		var _ne = min(.5, (_cw - 4) / max(1, max(string_width(_l1), string_width(_l2))));
-		draw_text_transformed_color(_kx + _cw / 2, _ky + 50, _l1, _ne, _ne, 0, c_white, c_white, c_white, c_white, 1);
-		if(_l2 != "") draw_text_transformed_color(_kx + _cw / 2, _ky + 59, _l2, _ne, _ne, 0, c_white, c_white, c_white, c_white, 1);
-		//PRA QUEM E
-		var _ct = _inf.eu ? TEMPO_VERDE : #FF5577;
-		draw_text_transformed_color(_kx + _cw / 2, _ky + _ch - 8, _inf.eu ? (_pt ? "PRA VOCE" : "FOR YOU") : (_pt ? "ATACA" : "ATTACK"), .42, .42, 0, _ct, _ct, _ct, _ct, 1);
-		//NUMERO DA TECLA DIRETA
-		draw_text_transformed_color(_kx + 6, _ky + 7, string(_n == 1 ? i + 1 : i + 5), .45, .45, 0, _cinza, _cinza, _cinza, _cinza, 1);
+		var _kx = _cx + (i - (_qtd - 1) / 2) * 50, _ky = _cy - 6;
+		if(_sel)
+		{
+			draw_set_color(merge_color(_cor, c_white, _pul * .5));
+			draw_rectangle(_kx - 21, _ky - 21, _kx + 21, _ky + 21, true);
+			draw_rectangle(_kx - 20, _ky - 20, _kx + 20, _ky + 20, true);
+		}
+		versus_icone_desenhar(_e.opcoes[i], _kx, _ky, _sel ? 1.9 : 1.4, _sel ? 1 : .45);
+		var _ct = _sel ? c_white : #5A5580;
+		draw_text_transformed_color(_kx - 17, _ky - 16, string(_n == 1 ? i + 1 : i + 5), .4, .4, 0, _ct, _ct, _ct, _ct, 1);
 	}
 
-	//O QUE A OPÇAO MARCADA FAZ
-	var _di = versus_opcao_info(_e.opcoes[_e.sel]).desc;
-	var _linhas = string_split(_di, "\n");
-	for(var i = 0; i < array_length(_linhas); i++) draw_text_transformed_color(_cx, _y1 + 22 + _ch + 14 + i * 10, _linhas[i], .45, .45, 0, c_white, c_white, c_white, c_white, 1);
+	//NOME DA OPÇAO MARCADA E PRA QUEM ELA E
+	var _inf = versus_opcao_info(_e.opcoes[_e.sel]);
+	var _ct = _inf.eu ? TEMPO_VERDE : #FF5577;
+	draw_text_transformed_color(_cx + 1, _cy + 28, _inf.nome, .65, .65, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_cx, _cy + 27, _inf.nome, .65, .65, 0, c_white, c_white, c_white, c_white, 1);
+	draw_text_transformed_color(_cx, _cy + 41, _inf.eu ? (_pt ? "PRA VOCE" : "FOR YOU") : (_pt ? "ATACA" : "ATTACK"), .45, .45, 0, _ct, _ct, _ct, _ct, 1);
 
-	//TECLAS
-	var _imp = imputs_jogador(_n);
-	draw_text_transformed_color(_cx, _y1 + 175, tecla_nome(_imp.left) + " " + tecla_nome(_imp.rigth) + (_pt ? "  ESCOLHE    " : "  PICK    ") + tecla_nome(_imp.soco) + (_pt ? "  CONFIRMA" : "  CONFIRM"), .4, .4, 0, _cinza, _cinza, _cinza, _cinza, 1);
-
-	//TEMPO QUE FALTA, EMBAIXO DA ARENA
+	//TEMPO QUE FALTA, EMBAIXO DA ARENA: UMA BARRA FINA E O NUMERO
 	var _fr = clamp(_e.t / _e.tot, 0, 1);
 	var _by = obj_area.y + 322;
 	var _ap = _fr < .35 and (current_time div 150) mod 2 == 0;
+	var _cb = _ap ? #FF5577 : _cor;
 	draw_set_color(#1E1A38);
-	draw_rectangle(_cx - 60, _by, _cx + 60, _by + 8, false);
-	draw_rectangle_color(_cx - 60, _by, _cx - 60 + 120 * _fr, _by + 8, _ap ? #FF5577 : _cor, _ap ? #FF5577 : _cor, _ap ? #FF5577 : merge_color(_cor, c_white, .4), _ap ? #FF5577 : merge_color(_cor, c_white, .4), false);
-	draw_set_color(#5A3A8A);
-	draw_rectangle(_cx - 60, _by, _cx + 60, _by + 8, true);
+	draw_rectangle(_cx - 50, _by, _cx + 50, _by + 3, false);
+	draw_set_color(_cb);
+	draw_rectangle(_cx - 50, _by, _cx - 50 + 100 * _fr, _by + 3, false);
 	var _seg = string(ceil(_e.t / room_speed));
-	draw_text_transformed_color(_cx + 1, _by + 17, _seg, 1.2, 1.2, 0, _sombra, _sombra, _sombra, _sombra, 1);
-	draw_text_transformed_color(_cx, _by + 16, _seg, 1.2, 1.2, 0, c_white, c_white, c_white, c_white, 1);
+	draw_text_transformed_color(_cx + 1, _by + 15, _seg, 1, 1, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	draw_text_transformed_color(_cx, _by + 14, _seg, 1, 1, 0, c_white, c_white, c_white, c_white, 1);
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
 	draw_set_color(c_white);
+}
+
+//A LINHA DOS ANDARES DO VERSUS (A MESMA DO ARCADE: FEIXE ENTRE AS DUAS CAPSULAS, COM PULSOS), UMA EM CADA ARENA. ELA MOSTRA O NIVEL DA PARTIDA:
+//NIVEL 1 = 2 CASAS DE ALTURA, NIVEL 2 = 6, NIVEL 3 = 10 (IGUAL AOS ANDARES DO ARCADE). SOBE SUAVE E VIBRA QUANDO O NIVEL SOBE
+function versus_linha_desenhar(_sx, _sy)
+{
+	var _alturas = [0, 2, 6, 10];
+	var _alvo = obj_area.y + obj_area.sprite_height - CEL * _alturas[versus_nivel()];
+	global.vs_linha_y = lerp(global.vs_linha_y, _alvo, .08);
+	global.vs_linha_int = lerp(global.vs_linha_int, 0, .05);
+	var _vib = min(1, global.vs_linha_int / 12);
+	var _pulso = .8 + .2 * sin(current_time / 250);
+	var _yy = global.vs_linha_y + _sy;
+	for(var z = 0; z < 2; z++)
+	{
+		var _zn = obj_area.zonas[z];
+		var _x1 = _zn.x - 10 + _sx, _x2 = _zn.x + VS_COLS * CEL + 5 + _sx;
+		var _n = 12;
+		var _px = array_create(_n + 1), _py = array_create(_n + 1);
+		for(var i = 0; i <= _n; i++)
+		{
+			_px[i] = lerp(_x1, _x2, i / _n);
+			_py[i] = _yy + ((i == 0 or i == _n) ? 0 : random_range(-6, 6) * _vib);
+		}
+		for(var i = 0; i < _n; i++)
+		{
+			draw_set_alpha((.16 + .3 * _vib) * _pulso);
+			draw_line_width_colour(_px[i], _py[i], _px[i + 1], _py[i + 1], 3 + 2 * _vib, #FFD84A, #FFD84A);
+			draw_set_alpha(min(1, .7 * _pulso + .3 * _vib));
+			draw_line_width_colour(_px[i], _py[i], _px[i + 1], _py[i + 1], 1, #FFF3B0, #FFF3B0);
+		}
+		//PULSOS DE ENERGIA CORRENDO (SO COM O FEIXE CALMO)
+		if(_vib < .3)
+		{
+			var _larg = _x2 - _x1;
+			draw_set_alpha(.9 * (1 - _vib / .3));
+			for(var k = 0; k < 3; k++)
+			{
+				var _p = _x1 + ((current_time / 14 + k * _larg / 3) mod _larg);
+				draw_line_width_colour(_p, _yy, min(_p + 8, _x2), _yy, 2, c_white, #FFD84A);
+			}
+		}
+		draw_set_alpha(1);
+		draw_set_color(c_white);
+		draw_sprite(spr_laser_cpsula, 0, _x1 + 5, _yy);
+		draw_sprite(spr_laser_cpsula, 1, _x2 + 5, _yy);
+	}
+}
+
+//TUDO DO VERSUS QUE TEM QUE FICAR NA FRENTE DAS PEÇAS (LINHA DOS ANDARES E MENU DE ESCOLHA). CHAMADO NO DRAW GUI DO OBJ_GAME_CONTROL,
+//COM A MATRIZ ESCALADA PRA DESENHAR EM PIXELS DA ROOM
+function versus_poderes_gui_desenhar()
+{
+	if(room != rm_versus or !instance_exists(obj_area) or !variable_instance_exists(obj_area, "zonas") or !obj_area.vs_montado) return;
+	var _e = gui_esc();
+	matrix_set(matrix_world, matrix_build(0, 0, 0, 0, 0, 0, _e, _e, 1));
+	versus_linha_desenhar(global.shake_x, global.shake_y + global.lerp_y);
+	for(var z = 0; z < 2; z++) versus_escolha_desenhar(z);
+	matrix_set(matrix_world, matrix_build_identity());
 }

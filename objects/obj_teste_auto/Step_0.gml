@@ -169,6 +169,15 @@ switch(etapa)
 	#endregion
 
 	#region VERSUS: PODERES POR ESCOLHA
+	case "vs_menu":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 190) { with(obj_area) versus_recompensa(0, 1); }
+		if(_t == 235) { with(obj_area) { zonas[0].escolha.sel = 0; } }
+		if(_t == 300) screen_save("teste_m1_menu.png");
+		if(_t == 330) { with(obj_area) { zonas[0].escolha.sel = 2; zonas[0].escolha.opcoes[2] = "Chuva"; } }
+		if(_t == 335) screen_save("teste_m2_menu.png");
+		if(_t == 340) { log("FIM"); game_end(); }
+		break;
 	case "vs_ajuda":
 		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
 		if(_t == 10) { obj_area.zonas[0].ajudas = ["Raio", "Especial"]; obj_area.zonas[1].ataques = ["Buraco", "LaserLado", "Colmeia", "Fantasma", "Sniper", "Bomba", "Cabecudo", "Pedra"]; }

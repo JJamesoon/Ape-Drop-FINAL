@@ -394,6 +394,9 @@ teclas_desenhar();
 //GORZ (SCR_PODERES): NO JOGO NORMAL DESENHA AQUI (DEPOIS A TELA DE PAUSA/RESULTADO SAI CEDO). COM PAUSA/RESULTADO ELE DESENHA NO FIM, POR CIMA
 if(alpha_pause < .01 and alpha_fim < .01) gorz_desenhar();
 
+//VERSUS: A LINHA DOS ANDARES E O MENU DE ESCOLHA DE PODER FICAM NA FRENTE DAS PEÇAS (SCR_COOP)
+if(alpha_pause < .01 and alpha_fim < .01) versus_poderes_gui_desenhar();
+
 //TELA DE PAUSA E DE RESULTADO (GAME OVER)
 //TUDO E POSICIONADO EM "PIXELS DA ROOM" E MULTIPLICADO POR _E, PORQUE A GUI E MAIOR QUE A ROOM
 if(alpha_pause < .01 and alpha_fim < .01) exit;
