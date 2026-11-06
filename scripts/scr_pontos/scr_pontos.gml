@@ -251,6 +251,15 @@ function pontos_tirar(_pontos, _x, _y, _jog = -1)
 		efeito_texto("-" + string(_pontos), _x, _y, c_red, .8);
 		exit;
 	}
+	//VERSUS: O PLAYER 2 TEM O PLACAR DELE (O DO PLAYER 1 E O PONTOS_1, IGUAL AO SOLO)
+	if(room == rm_versus and _jog == 2)
+	{
+		_pontos = min(round(_pontos), global.pontos_2);
+		if(_pontos <= 0) exit;
+		global.pontos_2 -= _pontos;
+		efeito_texto("-" + string(_pontos), _x, _y, c_red, .8);
+		exit;
+	}
 	_pontos = min(round(_pontos), global.pontos_1);
 	if(_pontos <= 0) exit;
 	global.pontos_1 -= _pontos;

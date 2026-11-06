@@ -149,6 +149,16 @@ switch(etapa)
 		break;
 	#endregion
 
+	#region DANO TIRA 100 PONTOS (SOLO E VERSUS)
+	case "dano100":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 10) { global.pontos_1 = 50; global.pontos_2 = 300; }
+		if(_t == 12) { player_n(1).dano_cobrar(); player_n(2).dano_cobrar(); log("versus: P1 50->" + string(global.pontos_1) + " (esperado 0) P2 300->" + string(global.pontos_2) + " (esperado 200)"); }
+		if(_t == 14) { var _v = player_n(1).vida_atual; player_n(1).dano_cobrar(); log("versus P1 sem pontos: vida " + string(_v) + "->" + string(player_n(1).vida_atual) + " (IMORTAL segura o coracao)"); }
+		if(_t == 20) { log("room=" + room_get_name(room) + " FIM"); game_end(); }
+		break;
+	#endregion
+
 	#region COOP: PEÇAS COM BLOCO 2-3 CASAS ACIMA DO PAI (J EM PE E I EM PE) NASCENDO NO TOPO DA ARENA DO COOP (Y = 32)
 	case "jcoop":
 		if(_t == 2)
