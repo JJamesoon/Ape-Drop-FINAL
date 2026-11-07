@@ -36,11 +36,17 @@ switch(etapa)
 		if(_t == 40) screen_save("teste_p1_pausa_solo.png");
 		if(_t == 42) obj_game_control.opcao_pause = 2;
 		if(_t == 70) screen_save("teste_p1b_pausa_solo_sel.png");
-		if(_t == 75) { log("FIM"); game_end(); }
+		if(_t == 72) obj_game_control.ver_comandos = true;
+		if(_t == 100) screen_save("teste_p1c_comandos.png");
+		if(_t == 102) { obj_game_control.ver_comandos = false; obj_game_control.ver_opcoes = true; obj_game_control.opcao_sub = 1; }
+		if(_t == 120) { var _vv = pausa_vis(); log("opcao_sub=" + string(obj_game_control.opcao_sub) + " mouse=" + string(_vv.mx) + "," + string(_vv.my) + " moveu=" + string(_vv.moveu) + " mouse_t=" + string(_vv.mouse_t)); }
+		if(_t == 130) screen_save("teste_p1d_opcoes.png");
+		if(_t == 135) { log("FIM"); game_end(); }
 		break;
 	case "pausa_versus":
 		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
 		if(_t == 5) obj_game_control.pausado = true;
+		if(_t == 20) obj_game_control.ver_comandos = true;
 		if(_t == 40) { screen_save("teste_p6_pausa_versus.png"); log("room=" + room_get_name(room) + " dois=" + string(dois_players()) + " linhas=" + string(array_length(pausa_comandos_linhas()))); }
 		if(_t == 45) { log("FIM"); game_end(); }
 		break;

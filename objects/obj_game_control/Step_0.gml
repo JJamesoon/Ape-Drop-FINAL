@@ -134,23 +134,34 @@ if(DEBUG_BLOCOS and modo_arcade() and !modo_versus())
 #region PAUSA (ESC)
 if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 {
-	//ESC OU P ABRE/FECHA A PAUSA (NA TELA DOS COMANDOS O ESC SO VOLTA PRA PAUSA)
-	if(pausado and ver_comandos and _voltar)
+	//MOUSE DA PAUSA (PC): VÊ SE MEXEU (SO ENTAO ELE ESCOLHE OPÇAO E OS OLHOS DO ALIEN O SEGUEM)
+	if(!MOBILE) pausa_mouse_atualizar();
+	//ESC OU P ABRE/FECHA A PAUSA (NAS TELAS DE COMANDOS E OPÇOES O ESC SO VOLTA PRA PAUSA)
+	if(pausado and (ver_comandos or ver_opcoes) and _voltar)
 	{
+		if(ver_opcoes) jogo_salvar();
 		ver_comandos = false;
+		ver_opcoes = false;
 		som_tocar(snd_menu_erro_02);
 	}
 	else if(_voltar or keyboard_check_pressed(ord("P")))
 	{
 		pausado = !pausado;
 		opcao_pause = 0;
+		ver_comandos = false;
+		ver_opcoes = false;
 		som_tocar(pausado ? snd_menu_select_01 : snd_menu_erro_02);
 	}
+	//OPÇOES (PC): VOLUME, TREMOR, TECLAS E TESTE DE DIFICULDADE (PAUSA_OPCOES_STEP, SCR_MENU)
+	else if(pausado and ver_opcoes)
+	{
+		if(pausa_opcoes_step(_up, _down, _enter) == "reiniciar") { reiniciar(); exit; }
+	}
 	//PAUSADO: CIMA/BAIXO ESCOLHE (PAUSA_IDS, SCR_MENU), R REINICIA, Q VAI PRO MENU
-	//NA TELA DOS COMANDOS QUALQUER TECLA DE CONFIRMAR OU VOLTAR FECHA ELA (O ESC NAO TIRA DA PAUSA)
+	//NA TELA DOS COMANDOS QUALQUER TECLA DE CONFIRMAR OU VOLTAR (OU UM CLIQUE) FECHA ELA (O ESC NAO TIRA DA PAUSA)
 	else if(pausado and ver_comandos)
 	{
-		if(_enter or keyboard_check_pressed(vk_backspace)) { ver_comandos = false; som_tocar(snd_menu_erro_02); }
+		if(_enter or keyboard_check_pressed(vk_backspace) or (!MOBILE and mouse_check_button_pressed(mb_left))) { ver_comandos = false; som_tocar(snd_menu_erro_02); }
 	}
 	else if(pausado)
 	{
@@ -160,15 +171,36 @@ if(!_player_morto and !instance_exists(obj_transisao) and !menu_poder)
 			opcao_pause = (opcao_pause + _down - _up + array_length(_ids)) mod array_length(_ids);
 			som_tocar(snd_menu_select_03);
 		}
+		//MOUSE (PC): PASSAR POR CIMA ESCOLHE (SO SE MEXEU), CLICAR CONFIRMA
+		var _clique = false;
+		if(!MOBILE)
+		{
+			var _vis = pausa_vis();
+			var _bs = pausa_botoes(pause_sel);
+			var _sobre = -1;
+			for(var i = 0; i < array_length(_bs); i++)
+			{
+				if(point_in_rectangle(_vis.mx, _vis.my, _bs[i][0] - _bs[i][2] / 2 - 4, _bs[i][1] - 18, _bs[i][0] + _bs[i][2] / 2 + 4, _bs[i][1] + 18)) _sobre = i;
+			}
+			if(_vis.moveu and _sobre != -1 and _sobre != opcao_pause)
+			{
+				opcao_pause = _sobre;
+				som_tocar(snd_menu_select_03);
+			}
+			_clique = mouse_check_button_pressed(mb_left) and _sobre != -1;
+			if(_clique) opcao_pause = _sobre;
+		}
 		if(keyboard_check_pressed(ord("R"))) { reiniciar(); exit; }
 		if(keyboard_check_pressed(ord("Q"))) { voltar_menu(); exit; }
-		if(_enter)
+		if(_enter or _clique)
 		{
 			som_tocar(snd_menu_select_01);
 			switch(_ids[opcao_pause])
 			{
 				case "continuar": pausado = false; break;
-				case "comandos": ver_comandos = true; break; //(SO NO CELULAR: NO PC OS COMANDOS FICAM SEMPRE NA TELA)
+				case "comandos": ver_comandos = true; break; //(NO PC E NO CELULAR: TELA COM TODAS AS TECLAS)
+				case "opcoes": ver_opcoes = true; opcao_sub = 0; break; //(SO NO PC)
+				case "sair": voltar_menu(); exit;
 				case "teclas": global.mostrar_teclas = !global.mostrar_teclas; jogo_salvar(); break; //LIGA/DESLIGA A TIRA DE COMANDOS
 				case "dificuldade":	//TESTE DE DIFICULDADE: LIGA/DESLIGA E REINICIA NA HORA (LIGADO: LEVEL 3 E 20 MIN, TODOS OS BLOCOS)
 					if(modo_versus() or MOBILE) { som_tocar(snd_menu_erro_04); break; }

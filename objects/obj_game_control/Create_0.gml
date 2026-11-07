@@ -20,6 +20,9 @@ if(modo_arcade() and !TESTE_AUTO)
 //PAUSE (ESC) E FIM DE JOGO
 pausado = false;
 ver_comandos = false;	//PAUSA: TELA COM OS COMANDOS (TECLADO E CONTROLE)
+ver_opcoes = false;		//PAUSA (PC): TELA DE OPÇOES (VOLUME, TREMOR, TECLAS, TESTE DE DIFICULDADE)
+opcao_sub = 0;			//LINHA ESCOLHIDA NA TELA DE OPÇOES
+sub_hold = 0;			//FRAMES COM ESQUERDA/DIREITA SEGURADO (REPETE O VOLUME)
 menu_debug = false;	//MENU DE DEBUG DOS BLOCOS (ENTER) ABERTO
 debug_opcao = 0;	//BLOCO SELECIONADO NO MENU DE DEBUG
 fim_jogo = false;		//TELA DE GAME OVER APARECENDO
