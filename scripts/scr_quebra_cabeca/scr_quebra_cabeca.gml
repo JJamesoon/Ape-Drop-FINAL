@@ -375,8 +375,8 @@ function desafio_premio_letra(_x, _y)
 	for(var i = 0; i < array_length(_l); i++) if(!_l[i]) array_push(_faltam, i);
 	if(array_length(_faltam) == 0) exit;
 	var _i = _faltam[irandom(array_length(_faltam) - 1)];
-	with(obj_letra) if(letra == _i) instance_destroy();
-	with(obj_peca) if(letra == _i) letra = -1;
+	with(obj_letra) if(letra == _i and (dono == 0 or dono == _n)) instance_destroy();
+	with(obj_peca) if(letra == _i and (letra_dono_em(x) == 0 or letra_dono_em(x) == _n)) letra = -1;
 	letra_coletar(_i, _x, _y, _n);
-	letra_chamar_atencao(_x, _y - 20, _i);
+	letra_chamar_atencao(_x, _y - 20, _i, room == rm_versus ? _n : 0);
 }

@@ -50,7 +50,7 @@ else if(instance_exists(meu_coletor))
 if(destruido_por != noone) global.blocos_destruidos++;
 
 //LETRA GUARDADA NO BLOCO: SAI PULANDO
-if(letra >= 0 and modo_arcade()) letra_criar(x, y, letra, true);
+if(letra >= 0 and modo_arcade()) letra_criar(x, y, letra, true, letra_dono_em(x));	//(VERSUS: SO O DONO DA ARENA PEGA)
 
 //BLOCO RAIO: CAI UM RAIO NELE, OS OBJETOS FICAM AZUL AQUA E OS PONTOS DOBRAM
 //(OS ESPINHOS E A BOMBA NAO CONTAM: ELES SAO CASTIGO, NAO O JOGADOR QUEBRANDO)

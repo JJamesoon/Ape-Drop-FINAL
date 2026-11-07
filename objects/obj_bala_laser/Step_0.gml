@@ -10,7 +10,7 @@ velv = lerp(velv, vel, .2);
 var _p = player_perto(x, y); //NO COOP, QUEM TA MAIS PERTO DA BALA
 if(!refletida and _p != noone)
 {
-	if(_p.estado != state.morte and tem_poder("reflexo") and _p.reflexo_energia >= REFLEXO_CUSTO and point_distance(x, y, _p.x, _p.y - 10) < 24)
+	if(_p.estado != state.morte and tem_poder("reflexo", _p.jogador) and _p.reflexo_energia >= REFLEXO_CUSTO and point_distance(x, y, _p.x, _p.y - 10) < 24)
 	{
 		_p.reflexo_energia -= REFLEXO_CUSTO;
 		_p.esquivar();

@@ -169,6 +169,40 @@ switch(etapa)
 	#endregion
 
 	#region VERSUS: PODERES POR ESCOLHA
+	case "vs_letras":
+		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
+		if(_t == 10)
+		{
+			with(obj_area) { letra_aparecer(1); letra_aparecer(2); }
+			var _l1 = 0, _l2 = 0, _b1 = 0, _b2 = 0;
+			with(obj_letra) { if(dono == 1) _l1++; if(dono == 2) _l2++; }
+			with(obj_peca) if(letra >= 0) { if(letra_dono_em(x) == 1) _b1++; else _b2++; }
+			log("letras nascidas: P1 soltas=" + string(_l1) + " em bloco=" + string(_b1) + " | P2 soltas=" + string(_l2) + " em bloco=" + string(_b2) + " (esperado 1 de cada)");
+			log("palavras: P1=" + string(letras_nomes_de(1)) + " P2=" + string(letras_nomes_de(2)));
+			//O P2 PARA EM CIMA DA LETRA DO P1 (NAO PODE PEGAR)
+			with(obj_letra) if(dono == 1) { var _q = player_n(2); _q.x = x; _q.y = y + 12; }
+		}
+		if(_t == 20) { var _n1 = 0; with(obj_letra) if(dono == 1) _n1++; log("depois do P2 encostar na letra do P1: ainda existe=" + string(_n1) + " (esperado 1) letras do P1 pegas=" + string(letras_de(1)) + " P2=" + string(letras_de(2))); }
+		if(_t == 21) { with(obj_letra) if(dono == 1) { var _q = player_n(1); _q.x = x; _q.y = y + 12; } }
+		if(_t == 30) { var _n1 = 0; with(obj_letra) if(dono == 1) _n1++; log("depois do P1 encostar: letras do P1=" + string(letras_de(1)) + " restam soltas=" + string(_n1) + " (esperado 0)"); }
+		if(_t == 31) { with(obj_letra) instance_destroy(); with(obj_peca) letra = -1; for(var i = 0; i < 7; i++) if(!letras_de(1)[i]) letra_coletar(i, 300, 200, 1); }
+		if(_t == 33) { var _z = obj_area.zonas[0]; log("palavra completa: recompensas=" + string(array_length(_z.recompensas)) + " | P2 completa=" + string(letras_completas(2))); }
+		if(_t == 45) { var _z = obj_area.zonas[0]; log("menu do poder: aberto=" + string(!is_undefined(_z.escolha)) + " poder=" + string(!is_undefined(_z.escolha) and _z.escolha.poder) + " opcoes=" + string(is_undefined(_z.escolha) ? [] : _z.escolha.opcoes)); screen_save("teste_vl1_menu_poder.png"); }
+		if(_t == 50) { with(obj_area) versus_escolha_fechar(0); var _z = obj_area.zonas[0]; log("escolheu: poderes P1=" + string(poderes_de(1)) + " P2=" + string(poderes_de(2)) + " palavra P1=" + string(_z.letras_nomes)); }
+		if(_t == 52) { var _id = poderes_de(1)[0]; var _a = false, _b = false; with(player_n(1)) _a = tem_poder(_id); with(player_n(2)) _b = tem_poder(_id); log("tem_poder(" + _id + ") visto pelo P1=" + string(_a) + " (esperado 1) pelo P2=" + string(_b) + " (esperado 0)"); }
+		if(_t == 55) { var _z = obj_area.zonas[0]; letra_coletar(0, 300, 200, 1); letra_coletar(1, 300, 200, 1); log("DROP: letras P1=" + string(_z.letras)); }
+		if(_t == 70) screen_save("teste_vl2_cartao.png");
+		if(_t == 80) { obj_area.zonas[0].slots[0] = "Raivoso"; versus_poder_usar(1, 0); log("usou RAIVOSO: raivosas do P2=" + string(obj_area.zonas[1].raivosas) + " (esperado 5) fila de ataques do P2=" + string(obj_area.zonas[1].ataques)); }
+		if(_t > 80 and _t mod 120 == 0 and _t < 800) { var _pp = 0, _rr = 0; with(obj_peca) if(sou_pai and letra_dono_em(x) == 2) { _pp++; if(sou_raivoso) _rr++; } log("t=" + string(_t) + " raivosas P2=" + string(obj_area.zonas[1].raivosas) + " pecas=" + string(_pp) + " raivosas vistas=" + string(_rr) + " perdedor=" + string(global.vs_perdedor)); }
+			if(_t == 800)
+		{
+			var _r = 0, _pais = 0;
+			with(obj_peca) if(sou_pai and letra_dono_em(x) == 2) { _pais++; if(sou_raivoso) _r++; }
+			log("depois de 1320 frames: raivosas que faltam=" + string(obj_area.zonas[1].raivosas) + " | pecas do P2 vistas=" + string(_pais) + " raivosas vistas=" + string(_r));
+			screen_save("teste_vl3_raivosas.png");
+			log("FIM"); game_end();
+		}
+		break;
 	case "vs_lento":
 		if(_t == 2 and room != rm_versus) { room_goto(rm_versus); exit; }
 		if(_t == 10) { obj_area.zonas[0].ajudas = ["Lento"]; }

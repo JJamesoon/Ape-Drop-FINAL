@@ -35,7 +35,7 @@ var _p = player_perto(x, y); //NO COOP, O MAIS PERTO
 
 //IMA: PUXA A MOEDA PRO PLAYER
 if(!_mov) { /* TEMPO PARADO: NAO SE MEXE */ }
-else if(_p != noone and tem_poder("ima") and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
+else if(_p != noone and tem_poder("ima", _p.jogador) and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
 {
 	var _dir = point_direction(x, y, _p.x, _p.y - 10);
 	x += lengthdir_x(3, _dir);

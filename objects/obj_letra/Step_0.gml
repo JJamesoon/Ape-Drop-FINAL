@@ -1,6 +1,6 @@
-//PAUSADO: A LETRA FICA PARADA (NO TEMPO PARADO O PLAYER AINDA PEGA ELA)
-if(global.game_pause and !tempo_player_livre()) exit;
-var _mov = !global.game_pause;
+//PAUSADO: A LETRA FICA PARADA (NO TEMPO PARADO O PLAYER AINDA PEGA ELA). NO VERSUS, SO A ARENA PARADA
+if(pausa_em(x) and !tempo_player_livre()) exit;
+var _mov = !pausa_em(x);
 
 //ENCOLHE ATE O TAMANHO NORMAL E SOME QUANDO O TEMPO ACABA
 if(_mov)
@@ -10,11 +10,12 @@ if(_mov)
 	if(timer <= 0) instance_destroy();
 }
 
-var _p = player_perto(x, y); //NO COOP, O MAIS PERTO
+var _p = dono > 0 ? player_n(dono) : player_perto(x, y); //NO COOP, O MAIS PERTO. NO VERSUS, SO O DONO DA ARENA PEGA
+var _pj = (_p != noone and variable_instance_exists(_p, "jogador")) ? _p.jogador : 1;
 
 //IMA: PUXA A LETRA PRO PLAYER
 if(!_mov) { /* TEMPO PARADO: NAO SE MEXE */ }
-else if(_p != noone and tem_poder("ima") and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
+else if(_p != noone and tem_poder("ima", _pj) and point_distance(x, y, _p.x, _p.y - 10) < IMA_RAIO)
 {
 	var _dir = point_direction(x, y, _p.x, _p.y - 10);
 	x += lengthdir_x(3, _dir);
@@ -43,6 +44,6 @@ else
 //PEGOU
 if(_p != noone and _p.estado != state.morte and point_distance(x, y, _p.x, _p.y - 10) < 14)
 {
-	letra_coletar(letra, x, y, variable_instance_exists(_p, "jogador") ? _p.jogador : 1);	//CADA JOGADOR TEM AS SUAS LETRAS (REPETIDA VIRA MOEDA)
+	letra_coletar(letra, x, y, _pj);	//CADA JOGADOR TEM AS SUAS LETRAS (REPETIDA VIRA MOEDA)
 	instance_destroy();
 }

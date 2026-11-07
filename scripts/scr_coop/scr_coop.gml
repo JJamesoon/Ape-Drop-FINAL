@@ -206,6 +206,8 @@ function borda_desenhar(_spr, _frame, _x, _y, _extra, _alpha = 1)
 #macro VS_MAX_ATAQUES		6		//BLOCOS PENDENTES NA FILA DE QUEM RECEBE (PODER NAO USA SE A FILA ESTA CHEIA)
 #macro VS_ESCOLHA_S		5		//SEGUNDOS PRA ESCOLHER O PODER (O JOGO DE QUEM FECHOU A LINHA FICA PARADO)
 #macro VS_ESCOLHA_ATRASO	0		//FRAMES ATE O MENU APARECER DEPOIS DE FECHAR A LINHA (APARECE NA HORA)
+#macro VS_ESCOLHA_PODER_S	8		//SEGUNDOS PRA ESCOLHER O PODER QUE A PALAVRA APEDROP DA (TEM O TEXTO DE CADA UM PRA LER)
+#macro VS_RAIVOSAS		5		//O ATAQUE RAIVOSO: QUANTAS DAS PROXIMAS PEÇAS DO ADVERSARIO NASCEM RAIVOSAS
 #macro VS_COR_P1			#4D7CFF		//AZUL (O LADO ESQUERDO)
 #macro VS_COR_P2			#FF553A		//VERMELHO (O LADO DIREITO)
 
@@ -307,8 +309,40 @@ function versus_criar()
 			regua_y : 0,					//ALTURA DESENHADA DA LINHA DOS ANDARES (SOBE SUAVE)
 			regua_int : 0,					//VIBRAÇAO DA LINHA (SOBE QUANDO MUDA DE ANDAR E VAI ACALMANDO)
 			sem_tele : 0,					//FRAMES SEM TELEPORTE (O ESPAÇO QUE CONFIRMA A ESCOLHA NAO PODE TELEPORTAR NO MESMO FRAME)
+			raivosas : 0,					//PEÇAS QUE AINDA NASCEM RAIVOSAS NESSA ARENA (ATAQUE RAIVOSO: VS_RAIVOSAS)
+			poderes : [],					//OS PODERES DO ARCADE (ASAS, DASH...) QUE ESSE JOGADOR GANHOU COM A PALAVRA APEDROP
+			letras : [],					//AS LETRAS A P E D R O P DESSE JOGADOR (VER VERSUS_LETRAS_ZERAR)
+			letras_nomes : [],
+			letra_pop : [],
+			letra_t : LETRA_PRIMEIRA,		//FRAMES ATE NASCER A PROXIMA LETRA NESSA ARENA
 		});
+		versus_letras_zerar(zonas[z]);
 	}
+}
+
+//ZERA AS LETRAS DE UMA ARENA: A PRIMEIRA PALAVRA E APEDROP, DEPOIS DO 1O PODER E SO DROP. AS QUE ESTAVAM NA ARENA SAO DA PALAVRA ANTIGA
+function versus_letras_zerar(_zn)
+{
+	_zn.letras_nomes = array_length(_zn.poderes) > 0 ? ["D", "R", "O", "P"] : ["A", "P", "E", "D", "R", "O", "P"];
+	var _q = array_length(_zn.letras_nomes);
+	_zn.letras = array_create(_q, false);
+	_zn.letra_pop = array_create(_q, 1);
+	var _dono = _zn.jogador;
+	with(obj_letra) if(dono == _dono) instance_destroy();
+	with(obj_peca) if(letra_dono_em(x) == _dono) letra = -1;
+}
+
+//O JOGADOR _N JUNTOU TODAS AS LETRAS: GANHA UMA ESCOLHA DE PODER (A ARENA DELE PARA, COMO NO MENU DAS LINHAS)
+function versus_palavra_completa(_n)
+{
+	var _a = obj_area;
+	var _zn = _a.zonas[_n - 1];
+	array_push(_zn.recompensas, { tipo : "poder" });
+	if(is_undefined(_zn.escolha) and _zn.escolha_atraso <= 0) _zn.escolha_atraso = VS_ESCOLHA_ATRASO;
+	var _w = "";
+	for(var i = 0; i < array_length(_zn.letras_nomes); i++) _w += _zn.letras_nomes[i];
+	efeito_texto(_w + "!", _zn.x + VS_COLS * CEL / 2, _a.y + 76, c_yellow, 1.6);
+	shakes(6, 2);
 }
 
 //CHAMADO NO 1O STEP DO OBJ_AREA: APAGA O RESTO DO VERSUS ANTIGO DA ROOM, CRIA PAREDES, CHAO E OS DOIS PLAYERS
@@ -396,6 +430,10 @@ function versus_spawn(_z)
 		global.prox_gelo = _zn.prox.gelo;
 	}
 
+	//ATAQUE RAIVOSO: AS PROXIMAS PEÇAS NORMAIS DESSA ARENA NASCEM RAIVOSAS (CAEM DIRETO, SEM PARAR)
+	var _raiva = _fonte == 0 and _zn.raivosas > 0 and global.prox_especie == "normal" and global.prox_fantasmas == 0 and !global.prox_gelo;
+	if(_raiva) global.debug_bloco = "Raivoso";
+
 	//TEM ALGO NA AREA ONDE A PEÇA NASCE? ENTAO ESPERA
 	if(collision_rectangle(_x1, y + CEL, _x2, (y + CEL) - CEL * 3, [obj_peca, obj_cria_peca, obj_inimigo], 0, 1))
 	{
@@ -405,6 +443,7 @@ function versus_spawn(_z)
 	var _escolha = versus_colunas(_zn, global.prox_tipo)[0];
 	instance_create_layer((x + CEL / 2) + CEL * _escolha.col, (y + CEL / 2) - CEL * 2, "Linha", obj_cria_peca);
 	_zn.lado_ultimo = _escolha.lado;
+	if(_raiva) _zn.raivosas--;
 	if(_fonte == 2) array_delete(_zn.ajudas, 0, 1);
 	else if(_fonte == 1) array_delete(_zn.ataques, 0, 1);
 	else _zn.prox = undefined; //A PROXIMA SO E SORTEADA NA PROXIMA TENTATIVA (O CRIADOR AINDA VAI LER AS GLOBAIS)
@@ -426,9 +465,13 @@ function versus_atualizar()
 		if(_zn.enviou > 0) _zn.enviou--;
 		if(_zn.sem_tele > 0) _zn.sem_tele--;
 		for(var k = 0; k < 4; k++) _zn.slot_pop[k] = max(0, _zn.slot_pop[k] - .06);
+		for(var k = 0; k < array_length(_zn.letra_pop); k++) _zn.letra_pop[k] = lerp(_zn.letra_pop[k], 1, .12);
 		versus_poderes_atualizar(z);
 		if(_zn.congelada) continue; //TEMPO PARADO (PODER DO FANTASMA): NAO NASCEM PEÇAS NESSA ARENA
 		if(!is_undefined(_zn.escolha)) continue; //ESCOLHENDO O PODER: A ARENA FICA PARADA
+		//LETRAS A P E D R O P: DE TEMPOS EM TEMPOS NASCE UMA QUE FALTA NA ARENA (O TEMPO PARA JUNTO COM ELA)
+		_zn.letra_t--;
+		if(_zn.letra_t <= 0) { _zn.letra_t = letra_intervalo(z + 1); letra_aparecer(z + 1); }
 		if(_zn.espera > 0) { _zn.espera--; continue; }
 		if(versus_spawn(z))
 		{
@@ -826,6 +869,32 @@ function versus_cartao_desenhar(_z, _esq)
 	draw_text_transformed_color(_x + 51.5, _y + 135, _val, _es, _es, 0, _sombra, _sombra, _sombra, _sombra, 1);
 	draw_text_transformed_color(_x + 50.5, _y + 134, _val, _es, _es, 0, c_white, c_white, c_white, c_white, 1);
 
+	//LETRAS A P E D R O P: AS QUE FALTAM FICAM APAGADAS (O DESENHO JA TEM). A QUE PEGOU GANHA A COR E UM "POP". DEPOIS DO 1O PODER SO D R O P (AS 4 ULTIMAS CASAS)
+	var _cores_l = [ #8BFF32, #FFFF00, #DE65FF, #31FCFF, #FF3237, #8BFF32, #FFFF00];
+	var _let = _zn.letras, _pop = _zn.letra_pop;
+	var _todas = letras_completas(_n);
+	var _desl = 7 - array_length(_let);
+	draw_set_font(fnt_hud);
+	for(var i = 0; i < array_length(_let); i++)
+	{
+		if(!_let[i]) continue;
+		var _lx = _x + 7 + 14 * (i + _desl), _ly = _y + 149.5;
+		var _hh = 5 * _pop[i];
+		var _c = _cores_l[i + _desl];
+		if(_todas and (current_time div 120) mod 2 == 0) _c = c_white;
+		draw_set_color(merge_color(_c, c_black, .5));
+		draw_rectangle(_lx - _hh, _ly - _hh, _lx + _hh, _ly + _hh, false);
+		draw_set_color(_c);
+		draw_rectangle(_lx - _hh, _ly - _hh, _lx + _hh - 1, _ly + _hh - 1, false);
+		draw_set_color(merge_color(_c, c_white, .55));
+		draw_rectangle(_lx - _hh, _ly - _hh, _lx + _hh - 1, _ly - _hh, false);
+		draw_rectangle(_lx - _hh, _ly - _hh, _lx - _hh, _ly + _hh - 1, false);
+		var _ts = .5 * _pop[i];
+		draw_set_halign(fa_center);
+		draw_set_valign(fa_middle);
+		draw_text_transformed_color(_lx, _ly, _zn.letras_nomes[i], _ts, _ts, 0, _sombra, _sombra, _sombra, _sombra, 1);
+	}
+
 	//EMBAIXO DA CAIXA: O QUE O ESPECIAL (FANTASMA) ESTA FAZENDO E A TECLA DO TELEPORTE
 	var _cx = _x + COOP_CAIXA_W / 2, _ty = _y + COOP_CAIXA_H + 10;
 	var _cinza = #92A1B9;
@@ -869,6 +938,19 @@ function versus_cartao_desenhar(_z, _esq)
 			draw_rectangle(_fx - 7, _fy - 7, _fx + 7, _fy + 7, true);
 			versus_icone_desenhar(_fila[i].id, _fx, _fy, .55);
 		}
+	}
+	//OS PODERES DO ARCADE QUE ELE GANHOU COM A PALAVRA (ASAS, DASH...): UM ICONE PEQUENO DE CADA, NA COR DO PODER
+	var _lista = global.poderes_lista, _qp = 0;
+	for(var i = 0; i < array_length(_lista); i++)
+	{
+		if(!array_contains(_zn.poderes, _lista[i].id)) continue;
+		var _ix = _x + 3 + 12 * _qp, _iy = _ty + 70;
+		draw_set_color(merge_color(_lista[i].cor, _sombra, .75));
+		draw_rectangle(_ix, _iy, _ix + 10, _iy + 10, false);
+		draw_set_color(_lista[i].cor);
+		draw_rectangle(_ix, _iy, _ix + 10, _iy + 10, true);
+		poder_icone_desenhar(_lista[i].id, _ix + 1, _iy + 1, 1, _lista[i].cor);
+		_qp++;
 	}
 	draw_set_halign(fa_left);
 	draw_set_valign(fa_top);
@@ -1913,6 +1995,8 @@ function coop_hud_desenhar()
 //	AJUDA: VELOCIDADE (O BLOCO LENTO: AO QUEBRAR, VOCE FICA RAPIDO), ELETRICO (RAIO: PONTOS EM DOBRO)
 //LINHAS FECHADAS AINDA CANCELAM ATAQUES QUE ESTAVAM CHEGANDO. O ANDAR (CHAO SUBINDO ATE A LINHA DOS ANDARES, COMO NO ARCADE) NAO MUDA AS OPÇOES.
 //(AINDA NAO TEM: O MINIJOGO QUE O ANDAR 3 DA NA 5A LINHA. A CONTA JA ESTA EM LIN3)
+//AS LETRAS A P E D R O P TAMBEM EXISTEM: CADA ARENA TEM AS SUAS (SO O DONO PEGA). PALAVRA COMPLETA = MENU COM 3 PODERES DO ARCADE (ASAS, DASH...), POR PARTIDA.
+//O ATAQUE RAIVOSO FAZ AS PROXIMAS 5 PEÇAS DO ADVERSARIO NASCEREM RAIVOSAS.
 
 //ALTURAS DA LINHA DOS ANDARES (EM CASAS, DO CHAO): ANDAR 1 = 2, ANDAR 2 = 6, ANDAR 3 = 10 (IGUAL AO ARCADE)
 //Y DA LINHA DOS ANDARES DA ZONA _Z (ONDE O CHAO TEM QUE CHEGAR PRA SUBIR DE ANDAR)
@@ -1979,7 +2063,7 @@ function versus_opcao_info(_id)
 	{
 		case "Lento":		_n = ["VELOCIDADE", "SPEED"];			_d = ["QUEBRE O BLOCO NA SUA ARENA\nE FIQUE RAPIDO", "BREAK THE BLOCK IN YOUR ARENA\nAND GET FAST"]; _eu = true; break;
 		case "Inimigo":		_n = ["PATRULHEIRO", "PATROL"];			_d = ["INIMIGO QUE PATRULHA A\nARENA DO ADVERSARIO", "ENEMY THAT PATROLS THE\nOPPONENT'S ARENA"]; break;
-		case "Raivoso":		_n = ["RAIVOSO", "ANGRY"];				_d = ["PEÇA QUE CAI DIRETO NA\nARENA DO ADVERSARIO", "PIECE THAT DROPS STRAIGHT\nIN THE OPPONENT'S ARENA"]; break;
+		case "Raivoso":		_n = ["RAIVOSO", "ANGRY"];				_d = ["AS PROXIMAS 5 PEÇAS DO\nADVERSARIO NASCEM RAIVOSAS", "THE OPPONENT'S NEXT 5\nPIECES COME OUT ANGRY"]; break;
 		case "Raio":		_n = ["ELETRICO", "ELECTRIC"];			_d = ["RAIO NA SUA ARENA:\nPONTOS EM DOBRO", "LIGHTNING IN YOUR ARENA:\nDOUBLE POINTS"]; _eu = true; break;
 		case "Pedra":		_n = ["PEDRA", "STONE"];				_d = ["BLOCO DURO: PRECISA DE\n2 GOLPES PRA QUEBRAR", "TOUGH BLOCK: TAKES\n2 HITS TO BREAK"]; break;
 		case "Buraco":		_n = ["BURACO NEGRO", "BLACK HOLE"];	_d = ["ENGOLE UM BLOCO E O SOLTA\nPEGANDO FOGO NO ADVERSARIO", "SWALLOWS A BLOCK AND DROPS\nIT BURNING ON THE OPPONENT"]; break;
@@ -2007,6 +2091,13 @@ function versus_icone_desenhar(_id, _x, _y, _esc, _a = 1)
 		bloco_icone_desenhar("normal", _x - 3 * _esc, _y + 6 * _esc, .55 * _esc, false, _a);
 		return;
 	}
+	if(_id == "Raivoso")
+	{
+		bloco_icone_desenhar("raivoso", _x - 5 * _esc, _y - 5 * _esc, .55 * _esc, false, _a);
+		bloco_icone_desenhar("raivoso", _x + 5 * _esc, _y - 1 * _esc, .55 * _esc, false, _a);
+		bloco_icone_desenhar("raivoso", _x - 2 * _esc, _y + 6 * _esc, .55 * _esc, false, _a);
+		return;
+	}
 	if(_id == "Duplas")
 	{
 		bloco_icone_desenhar("normal", _x - 5 * _esc, _y, .7 * _esc, false, _a);
@@ -2022,7 +2113,7 @@ function versus_recompensa(_z, _n)
 	var _zn = zonas[_z];
 	if(_zn.andar >= 3) _zn.lin3 += _n;
 	if(array_length(_zn.recompensas) >= 3) return; //(MUITA COISA NA FILA: IGNORA)
-	array_push(_zn.recompensas, {});
+	array_push(_zn.recompensas, { tipo : "linha" });
 	if(is_undefined(_zn.escolha) and _zn.escolha_atraso <= 0) _zn.escolha_atraso = VS_ESCOLHA_ATRASO;
 }
 
@@ -2063,6 +2154,8 @@ function versus_poderes_atualizar(_z)
 function versus_escolha_abrir(_z)
 {
 	var _zn = zonas[_z];
+	//A RECOMPENSA DA VEZ E A PALAVRA APEDROP: ESCOLHE UM PODER DO ARCADE (ASAS, DASH...) EM VEZ DE UM BLOCO
+	if(variable_struct_exists(_zn.recompensas[0], "tipo") and _zn.recompensas[0].tipo == "poder") { versus_escolha_abrir_poder(_z); return; }
 	var _ataques = versus_pool_ataque();
 	var _op = [];
 	while(array_length(_op) < 2)
@@ -2078,11 +2171,45 @@ function versus_escolha_abrir(_z)
 		var _k = irandom(i);
 		var _tmp = _op[i]; _op[i] = _op[_k]; _op[_k] = _tmp;
 	}
-	_zn.escolha = { opcoes : _op, sel : 0, t : room_speed * VS_ESCOLHA_S, tot : room_speed * VS_ESCOLHA_S };
+	_zn.escolha = { opcoes : _op, sel : 0, t : room_speed * VS_ESCOLHA_S, tot : room_speed * VS_ESCOLHA_S, poder : false };
 	var _p = player_n(_z + 1);
 	if(_p != noone) { _p.vs_parado = true; _p.velh = 0; }
 	som_tocar(snd_jingle_poder, .05);
 	efeito_texto(global.linguagem == 0 ? "ESCOLHA!" : "PICK ONE!", _zn.x + VS_COLS * CEL / 2, y + 40, c_yellow, 1.3);
+}
+
+//MENU DA PALAVRA APEDROP: 3 PODERES DO ARCADE QUE O JOGADOR AINDA NAO TEM (O PRIMEIRO SEMPRE E ASAS OU DASH, COMO NO ARCADE)
+function versus_escolha_abrir_poder(_z)
+{
+	var _zn = zonas[_z];
+	var _disp = [];
+	for(var i = 0; i < array_length(global.poderes_lista); i++)
+	{
+		if(!array_contains(_zn.poderes, global.poderes_lista[i].id)) array_push(_disp, global.poderes_lista[i].id);
+	}
+	array_shuffle_ext(_disp);
+	var _op = [];
+	for(var i = 0; i < min(3, array_length(_disp)); i++) array_push(_op, _disp[i]);
+	if(array_length(_zn.poderes) == 0 and array_length(_op) > 0)
+	{
+		var _mov = choose("asas", "dash");
+		var _onde = -1;
+		for(var i = 0; i < array_length(_op); i++) if(_op[i] == "asas" or _op[i] == "dash") { _onde = i; break; }
+		if(_onde == -1) _op[0] = _mov;
+		else { var _tmp = _op[0]; _op[0] = _op[_onde]; _op[_onde] = _tmp; }
+	}
+	//JA TEM TODOS: SO RECOMEÇA A PALAVRA
+	if(array_length(_op) == 0)
+	{
+		versus_letras_zerar(_zn);
+		array_delete(_zn.recompensas, 0, 1);
+		return;
+	}
+	_zn.escolha = { opcoes : _op, sel : 0, t : room_speed * VS_ESCOLHA_PODER_S, tot : room_speed * VS_ESCOLHA_PODER_S, poder : true };
+	var _p = player_n(_z + 1);
+	if(_p != noone) { _p.vs_parado = true; _p.velh = 0; }
+	som_tocar(snd_new_level, .05);
+	efeito_texto(global.linguagem == 0 ? "NOVO PODER!" : "NEW POWER!", _zn.x + VS_COLS * CEL / 2, y + 40, c_yellow, 1.3);
 }
 
 //CONFIRMOU: GUARDA O PODER NUMA CAIXA (SE TODAS ESTAO CHEIAS, SUBSTITUI O MAIS ANTIGO) E O JOGO VOLTA
@@ -2091,6 +2218,21 @@ function versus_escolha_fechar(_z)
 	var _zn = zonas[_z];
 	var _e = _zn.escolha;
 	var _id = _e.opcoes[_e.sel];
+	//PODER DO ARCADE: FICA COM O JOGADOR A PARTIDA TODA E A PALAVRA RECOMEÇA (SO DROP)
+	if(_e.poder)
+	{
+		poder_ganhar(_id, _z + 1);
+		versus_letras_zerar(_zn);
+		_zn.escolha = undefined;
+		_zn.sem_tele = 6;
+		array_delete(_zn.recompensas, 0, 1);
+		var _pp = player_n(_z + 1);
+		if(_pp != noone and !instance_exists(_zn.fantasma)) _pp.vs_parado = false;
+		if(array_length(_zn.recompensas) > 0) _zn.escolha_atraso = 18;
+		som_tocar(snd_certo, .05);
+		efeito_texto(poder_nome(_id), _zn.x + VS_COLS * CEL / 2, y + 40, poder_info(_id).cor, 1.3);
+		return;
+	}
 	var _s = -1;
 	for(var i = 0; i < 4; i++) if(_zn.slots[i] == "") { _s = i; break; }
 	if(_s < 0)
@@ -2121,7 +2263,7 @@ function versus_poder_usar(_n, _i)
 	var _inf = versus_opcao_info(_id);
 	var _al = obj_area.zonas[2 - _n];
 	var _alvo = _inf.eu ? _zn : _al;
-	var _especial = _id == "Chuva" or _id == "Duplas";
+	var _especial = _id == "Chuva" or _id == "Duplas" or _id == "Raivoso";	//(NAO ENTRAM NA FILA DE BLOCOS: SO MUDAM AS PEÇAS QUE VEM)
 	var _fila = _inf.eu ? _alvo.ajudas : _alvo.ataques;
 	if(!_especial and array_length(_fila) >= VS_MAX_ATAQUES)
 	{
@@ -2133,6 +2275,7 @@ function versus_poder_usar(_n, _i)
 	{
 		case "Chuva":	_alvo.chuva += 7; break;
 		case "Duplas":	_alvo.duplas += 6; _alvo.dupla_par = false; break;
+		case "Raivoso":	_alvo.raivosas += VS_RAIVOSAS; break;
 		default:		array_push(_fila, _id); break;
 	}
 	_zn.slots[_i] = "";
@@ -2194,17 +2337,25 @@ function versus_escolha_desenhar(_z)
 			draw_rectangle(_kx - 21, _ky - 21, _kx + 21, _ky + 21, true);
 			draw_rectangle(_kx - 20, _ky - 20, _kx + 20, _ky + 20, true);
 		}
-		versus_icone_desenhar(_e.opcoes[i], _kx, _ky, _sel ? 1.9 : 1.4, _sel ? 1 : .45);
+		if(_e.poder)
+		{
+			var _ps = _sel ? 4 : 3;	//(ICONE 9X9: CADA PIXEL VIRA _PS)
+			poder_icone_desenhar(_e.opcoes[i], _kx - 4.5 * _ps, _ky - 4.5 * _ps, _ps, poder_info(_e.opcoes[i]).cor, false, _sel ? 1 : .45);
+		}
+		else versus_icone_desenhar(_e.opcoes[i], _kx, _ky, _sel ? 1.9 : 1.4, _sel ? 1 : .45);
 		var _ct = _sel ? c_white : #5A5580;
 		draw_text_transformed_color(_kx - 17, _ky - 16, string(_n == 1 ? i + 1 : i + 5), .4, .4, 0, _ct, _ct, _ct, _ct, 1);
 	}
 
 	//NOME DA OPÇAO MARCADA E PRA QUEM ELA E
-	var _inf = versus_opcao_info(_e.opcoes[_e.sel]);
+	var _inf = _e.poder ? { nome : poder_nome(_e.opcoes[_e.sel]), eu : true } : versus_opcao_info(_e.opcoes[_e.sel]);
 	var _ct = _inf.eu ? TEMPO_VERDE : #FF5577;
 	draw_text_transformed_color(_cx + 1, _cy + 28, _inf.nome, .65, .65, 0, _sombra, _sombra, _sombra, _sombra, 1);
 	draw_text_transformed_color(_cx, _cy + 27, _inf.nome, .65, .65, 0, c_white, c_white, c_white, c_white, 1);
-	draw_text_transformed_color(_cx, _cy + 41, _inf.eu ? (_pt ? "PRA VOCE" : "FOR YOU") : (_pt ? "ATACA" : "ATTACK"), .45, .45, 0, _ct, _ct, _ct, _ct, 1);
+	//(O PODER DO ARCADE MOSTRA O QUE ELE FAZ EM VEZ DE "PRA VOCE")
+	var _rot = _e.poder ? poder_desc(_e.opcoes[_e.sel]) : (_inf.eu ? (_pt ? "PRA VOCE" : "FOR YOU") : (_pt ? "ATACA" : "ATTACK"));
+	var _re = min(.45, (VS_COLS * CEL - 12) / max(1, string_width(_rot)));
+	draw_text_transformed_color(_cx, _cy + 41, _rot, _re, _re, 0, _ct, _ct, _ct, _ct, 1);
 
 	//TEMPO QUE FALTA, EMBAIXO DA ARENA: UMA BARRA FINA E O NUMERO
 	var _fr = clamp(_e.t / _e.tot, 0, 1);

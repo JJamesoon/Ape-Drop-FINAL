@@ -149,10 +149,28 @@ function poder_icone_desenhar(_id, _x, _y, _esc, _cor, _apagado = false, _a = 1)
 	}
 }
 
-//O PLAYER JA TEM ESSE PODER?
-function tem_poder(_id)
+//OS PODERES DE UM JOGADOR. NO ARCADE E NO COOP E UMA LISTA SO. NO VERSUS CADA ARENA TEM OS SEUS (_N = 1 OU 2;
+//SEM _N USA O DONO DE QUEM CHAMOU: O PROPRIO JOGADOR OU O DONO DA ARENA ONDE A INSTANCIA ESTA)
+function poderes_de(_n = 0)
 {
-	return array_contains(global.poderes, _id);
+	if(room != rm_versus) return global.poderes;
+	if(!instance_exists(obj_area) or !variable_instance_exists(obj_area, "zonas")) return [];
+	if(_n <= 0) _n = poder_dono();
+	return obj_area.zonas[clamp(_n, 1, 2) - 1].poderes;
+}
+
+//VERSUS: DE QUEM E A INSTANCIA QUE CHAMOU (O JOGADOR, OU O DONO DA ARENA ONDE ELA ESTA)
+function poder_dono()
+{
+	if(variable_instance_exists(id, "jogador")) return jogador;
+	var _z = versus_zona_x(x);
+	return _z >= 0 ? _z + 1 : 1;
+}
+
+//O PLAYER JA TEM ESSE PODER? (NO VERSUS, _N = DE QUAL JOGADOR; SEM _N, DE QUEM CHAMOU)
+function tem_poder(_id, _n = 0)
+{
+	return array_contains(poderes_de(_n), _id);
 }
 
 //DADOS DO PODER (NOME, DESCRIÇAO, COR) PELO ID
@@ -177,16 +195,21 @@ function poder_desc(_id)
 	return poder_info(_id).desc[clamp(global.linguagem, 0, 1)];
 }
 
-//GANHA O PODER (ELES ACUMULAM)
-function poder_ganhar(_id)
+//GANHA O PODER (ELES ACUMULAM). NO VERSUS, _N = QUEM GANHOU
+function poder_ganhar(_id, _n = 0)
 {
-	if(!tem_poder(_id)) array_push(global.poderes, _id);
-	//GANHAR QUALQUER PODER ENCHE AS BARRAS DO REFLEXO E DO ESCUDO
+	var _lista = poderes_de(_n);
+	if(!array_contains(_lista, _id)) array_push(_lista, _id);
+	//GANHAR QUALQUER PODER ENCHE AS BARRAS DO REFLEXO E DO ESCUDO (NO VERSUS, SO DE QUEM GANHOU)
+	var _dono = room == rm_versus ? (_n > 0 ? _n : poder_dono()) : 0;
 	with(obj_player)
 	{
-		reflexo_energia = 100;
-		escudo_vida = 100;
-		escudo_quebrado = false;
+		if(_dono == 0 or jogador == _dono)
+		{
+			reflexo_energia = 100;
+			escudo_vida = 100;
+			escudo_quebrado = false;
+		}
 	}
 }
 
@@ -207,10 +230,10 @@ function letras_reiniciar()
 }
 
 //TEMPO ATE A PROXIMA LETRA: RAPIDO ATE O 1O PODER, DEPOIS VAI FICANDO MAIS RARO A CADA PODER
-function letra_intervalo()
+function letra_intervalo(_jog = 0)
 {
 	//SEM PODER: BEM MAIS FREQUENTE. DEPOIS, QUANTO MAIS PODERES, MAIS RARAS (1 PODER = 25S, 2 = 35S, 3 = 45S...)
-	var _n = array_length(global.poderes);
+	var _n = array_length(poderes_de(_jog));
 	if(_n == 0) return LETRA_INTERVALO_INICIO;
 	return LETRA_INTERVALO * (1 + (_n - 1) * LETRA_RARIDADE);
 }
@@ -218,13 +241,29 @@ function letra_intervalo()
 //AS LETRAS DE UM JOGADOR (1 OU 2). NO COOP CADA UM TEM A SUA PALAVRA; NO ARCADE SO EXISTE O 1
 function letras_de(_n)
 {
+	if(room == rm_versus) return obj_area.zonas[clamp(_n, 1, 2) - 1].letras;	//(VERSUS: CADA ARENA TEM AS SUAS)
 	return _n == 2 ? global.letras2 : global.letras;
 }
 
 //O "POP" DAS LETRAS NO HUD DE UM JOGADOR
 function letra_pop_de(_n)
 {
+	if(room == rm_versus) return obj_area.zonas[clamp(_n, 1, 2) - 1].letra_pop;
 	return _n == 2 ? global.letra_pop2 : global.letra_pop;
+}
+
+//AS LETRAS DA PALAVRA DO JOGADOR _N (NO VERSUS CADA UM TEM A SUA: APEDROP OU, DEPOIS DO 1O PODER, DROP)
+function letras_nomes_de(_n = 0)
+{
+	if(room == rm_versus and _n > 0) return obj_area.zonas[clamp(_n, 1, 2) - 1].letras_nomes;
+	return global.letras_nomes;
+}
+
+//VERSUS: DE QUEM SAO AS LETRAS QUE ESTAO NESSE X (O DONO DA ARENA). 0 FORA DO VERSUS OU FORA DAS ARENAS
+function letra_dono_em(_x)
+{
+	if(room != rm_versus) return 0;
+	return versus_zona_x(_x) + 1;
 }
 
 //O JOGADOR _N PEGOU TODAS AS LETRAS?
@@ -236,34 +275,38 @@ function letras_completas(_n = 1)
 }
 
 //SORTEIA UMA LETRA QUE FALTA E QUE AINDA NAO TA NA TELA NEM DENTRO DE UM BLOCO (-1 SE NAO TIVER)
-function letra_sortear()
+//VERSUS: _N = O JOGADOR (SO CONTAM AS LETRAS DA ARENA DELE). NO ARCADE E NO COOP, _N = 0
+function letra_sortear(_n = 0)
 {
 	var _opcoes = [];
-	for(var i = 0; i < array_length(global.letras); i++)
+	var _lt = _n > 0 ? letras_de(_n) : global.letras;
+	for(var i = 0; i < array_length(_lt); i++)
 	{
+		if(_n > 0) { if(_lt[i]) continue; }
 		//NO COOP A LETRA SO SAI SE ALGUM DOS DOIS AINDA NAO TEM
-		if(global.letras[i] and (!global.coop or global.letras2[i])) continue;
+		else if(global.letras[i] and (!global.coop or global.letras2[i])) continue;
 		var _ja = false;
-		with(obj_letra) if(letra == i) _ja = true;
-		with(obj_peca) if(letra == i) _ja = true;
+		with(obj_letra) if(letra == i and (_n == 0 or dono == _n)) _ja = true;
+		with(obj_peca) if(letra == i and (_n == 0 or letra_dono_em(x) == _n)) _ja = true;
 		if(!_ja) array_push(_opcoes, i);
 	}
 	if(array_length(_opcoes) == 0) return -1;
 	return _opcoes[irandom(array_length(_opcoes) - 1)];
 }
 
-//LETRA SOLTA NA ARENA (_SAINDO = SAIU DE UM BLOCO: DA UM PULINHO)
-function letra_criar(_x, _y, _i, _saindo = false)
+//LETRA SOLTA NA ARENA (_SAINDO = SAIU DE UM BLOCO: DA UM PULINHO). VERSUS: _DONO = O JOGADOR QUE PODE PEGAR
+function letra_criar(_x, _y, _i, _saindo = false, _dono = 0)
 {
 	var _l = instance_create_depth(_x, _y, -1500, obj_letra);
 	_l.letra = _i;
+	_l.dono = _dono;
 	if(_saindo) _l.velv = -2.5;
-	letra_chamar_atencao(_x, _y, _i);
+	letra_chamar_atencao(_x, _y, _i, _dono);
 	return _l;
 }
 
 //LETRA APARECEU: ANEIS, SOM E O NOME DA LETRA PRA CHAMAR ATENÇAO
-function letra_chamar_atencao(_x, _y, _i)
+function letra_chamar_atencao(_x, _y, _i, _n = 0)
 {
 	for(var k = 0; k < 2; k++)
 	{
@@ -271,21 +314,21 @@ function letra_chamar_atencao(_x, _y, _i)
 		_a.modo = "anel";
 		_a.timer = 16 + k * 10;
 	}
-	efeito_texto(global.letras_nomes[_i] + "!", _x, _y - 18, c_yellow, 1.6);
+	efeito_texto(letras_nomes_de(_n)[_i] + "!", _x, _y - 18, c_yellow, 1.6);
 	audio_play_sound(snd_coin, 1, false, 1, 0, 1.4);
 }
 
-//COLOCA UMA LETRA NA ARENA: DENTRO DE UM BLOCO PARADO OU SOLTA
-function letra_aparecer()
+//COLOCA UMA LETRA NA ARENA: DENTRO DE UM BLOCO PARADO OU SOLTA (VERSUS: _N = A ARENA DO JOGADOR)
+function letra_aparecer(_n = 0)
 {
-	var _i = letra_sortear();
+	var _i = letra_sortear(_n);
 	if(_i == -1 or !instance_exists(obj_area)) exit;
 
 	//METADE DAS VEZES TENTA COLOCAR DENTRO DE UM BLOCO NORMAL PARADO
 	if(random(100) < LETRA_NO_BLOCO)
 	{
 		var _blocos = [];
-		with(obj_peca) if(estou_parado and !andar and sou_normal and letra == -1 and destruido_por == noone) array_push(_blocos, id);
+		with(obj_peca) if(estou_parado and !andar and sou_normal and letra == -1 and destruido_por == noone and (_n == 0 or letra_dono_em(x) == _n)) array_push(_blocos, id);
 		if(array_length(_blocos) > 0)
 		{
 			with(_blocos[irandom(array_length(_blocos) - 1)])
@@ -294,14 +337,19 @@ function letra_aparecer()
 				letra_timer = LETRA_VIDA;
 				alpha_fog = 1;
 				esc = 1.4;
-				letra_chamar_atencao(x, y, _i);
+				letra_chamar_atencao(x, y, _i, _n);
 			}
 			exit;
 		}
 	}
 	//SEM BLOCO (OU NAO SORTEOU): SOLTA NUM LUGAR ALEATORIO DA METADE DE CIMA DA ARENA
 	var _a = obj_area;
-	letra_criar(_a.x + 24 + random(_a.sprite_width - 48), _a.y + 40 + random(_a.sprite_height * .5), _i);
+	if(_n > 0)
+	{
+		var _zn = _a.zonas[_n - 1];
+		letra_criar(_zn.x + 24 + random(VS_COLS * CEL - 48), _a.y + 40 + random(_a.sprite_height * .5), _i, false, _n);
+	}
+	else letra_criar(_a.x + 24 + random(_a.sprite_width - 48), _a.y + 40 + random(_a.sprite_height * .5), _i);
 }
 
 //O JOGADOR _N PEGOU UMA LETRA. SE ELE JA TEM ESSA LETRA, ELA VIRA UMA MOEDA (NO COOP CADA UM TEM AS SUAS)
@@ -320,10 +368,14 @@ function letra_coletar(_i, _x, _y, _n = 1)
 	//CADA LETRA PEGA TOCA A NOTA SEGUINTE (A PALAVRA VAI "SUBINDO"). COMPLETOU: JINGLE DO PODER
 	var _pegas = 0;
 	for(var k = 0; k < array_length(_l); k++) if(_l[k]) _pegas++;
-	if(letras_completas(_n)) som_tocar(snd_jingle_poder);
+	if(letras_completas(_n))
+	{
+		som_tocar(snd_jingle_poder);
+		if(room == rm_versus) versus_palavra_completa(_n);	//VERSUS: GANHA UMA ESCOLHA DE PODER (SO PRA ARENA DELE)
+	}
 	else som_nota(4 + _pegas, .7);
 	onda_choque(_x, _y, 34, 3, 18);
-	efeito_texto(global.letras_nomes[_i], _x, _y - 10, c_yellow, 1.4);
+	efeito_texto(letras_nomes_de(_n)[_i], _x, _y - 10, c_yellow, 1.4);
 }
 
 //==================== PODER DE PARAR O TEMPO (ENERGIA CHEIA + TECLA 1) ====================
